@@ -610,7 +610,30 @@ re-runnable and leaves the install as it found it (checked after two runs: one
 draft survey, zero responses, no stray pages or users, settings restored). It
 runs `workers: 1` because it mutates one shared WordPress.
 
-**Two hard-won details, both encoded in `support/`:**
+**CI must build the assets — `suite.json`'s `install` is
+`pnpm install --frozen-lockfile && pnpm build`.** `resources/build/` is
+gitignored, so a CI checkout has no compiled admin SPA and no compiled widget.
+Without the build step the failure is quietly misleading rather than obvious:
+every REST-only and server-rendered spec passes while every spec that needs
+JavaScript fails, which reads exactly like a product regression in the UI. That
+is what run 34095509973 was — 16 passed, and the only three failures were the
+forms list and the two targeting specs, all of them waiting on markup React
+never rendered. Do not remove the build step to speed CI up.
+
+A related trap for anyone debugging this locally: deleting `resources/build/` is
+**not** a faithful simulation of that CI state — it breaks the site harder and
+earlier (login itself fails), so it will send you after the wrong cause. Read the
+CI log's `installing:` line instead.
+
+**A fresh install redirects the first admin page load to the wizard.** While
+`allfeedback_wizard_status` is `not_started`, `maybeRedirectToWizard()` sends
+`admin.php?page=allfeedback` to `#/wizard` and exits — and because the redirect
+flips the status to `initiated`, it fires exactly once, landing on whichever spec
+reaches wp-admin first. `auth.setup.ts` now completes the wizard right after
+login so every spec starts from the same state. Verified by resetting the wizard
+to `not_started` and re-running: 73/73.
+
+**Two more hard-won details, both encoded in `support/`:**
 
 - **Role boundaries need application-password auth.** A 401 from an anonymous
   caller proves nothing on its own, because a missing nonce produces the same

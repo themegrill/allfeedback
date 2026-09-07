@@ -1,7 +1,7 @@
 {
   "runner": "playwright",
   "package_manager": "pnpm",
-  "install": "pnpm install --frozen-lockfile",
+  "install": "pnpm install --frozen-lockfile && pnpm build",
   "command": "pnpm exec playwright test",
   "config": "playwright.config.ts",
   "spec_dir": "tests/e2e/specs",
@@ -81,5 +81,6 @@
       "resources/scripts/admin/api/logs.ts"
     ]
   },
-  "_area_paths_note": "Proposed by /claudegrill:setup, mechanically validated (no dead globs), NOT ratified by a maintainer. Cross-cutting code is left unmapped ON PURPOSE so a change to it falls back to the full tier: config/ (DI wiring), src/Core/{Container,Events,Jobs,Cache,Features,Exceptions}, src/Support/ (except Logger), src/Modules/, src/Traits/ and shared admin components all affect every area. Narrowing those would trade coverage for speed."
+  "_area_paths_note": "Proposed by /claudegrill:setup, mechanically validated (no dead globs), NOT ratified by a maintainer. Cross-cutting code is left unmapped ON PURPOSE so a change to it falls back to the full tier: config/ (DI wiring), src/Core/{Container,Events,Jobs,Cache,Features,Exceptions}, src/Support/ (except Logger), src/Modules/, src/Traits/ and shared admin components all affect every area. Narrowing those would trade coverage for speed.",
+  "_install_note": "`pnpm build` is NOT optional. resources/build/ is gitignored, so a CI checkout has no compiled admin SPA or frontend widget. Without it every UI spec fails while the REST-only specs pass \u2014 which reads like a product regression and is not one."
 }

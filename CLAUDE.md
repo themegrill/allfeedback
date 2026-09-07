@@ -47,6 +47,12 @@ pnpm exec playwright show-report
 > 4. Never drive the widget on the site home page — the theme's hero image
 >    overlays it and intercepts clicks. Use `Wp.createBlankPage()`.
 >
+> **CI builds the assets** — `.themegrill-qa/suite.json` runs
+> `pnpm install --frozen-lockfile && pnpm build`, because `resources/build/` is
+> gitignored and a CI checkout would otherwise have no compiled SPA or widget.
+> Drop that build step and every JS-dependent spec fails while the REST-only ones
+> pass, which looks like a UI regression and is not one.
+>
 > Three specs in `block-embed.spec.ts` are `test.fail()` markers pinning the open
 > `SurveyBlock` bug below; they will start failing when it is fixed, which is the
 > signal to delete them. See `tests/e2e/support/` and
