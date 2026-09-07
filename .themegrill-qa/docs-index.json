@@ -1,0 +1,75 @@
+{
+  "source": "https://docs.allfeedback.net/sitemap.xml",
+  "mode": "sitemap",
+  "sections": [
+    {
+      "section": "building-forms",
+      "label": "building-forms",
+      "parent": null,
+      "file": "docs/building-forms.md",
+      "articles": 5,
+      "failed": 0,
+      "thin": [],
+      "outcomes": 21,
+      "titles": [
+        "Creating & managing forms",
+        "Displaying Forms",
+        "Field types",
+        "Form settings",
+        "Styling a form"
+      ]
+    },
+    {
+      "section": "settings",
+      "label": "settings",
+      "parent": null,
+      "file": "docs/settings.md",
+      "articles": 3,
+      "failed": 0,
+      "thin": [],
+      "outcomes": 7,
+      "titles": [
+        "Advanced settings",
+        "Email settings",
+        "General settings"
+      ]
+    },
+    {
+      "section": "analytics-reporting",
+      "label": "analytics-reporting",
+      "parent": null,
+      "file": "docs/analytics-reporting.md",
+      "articles": 3,
+      "failed": 0,
+      "thin": [],
+      "outcomes": 4,
+      "titles": [
+        "Analytics overview",
+        "NPS distribution & scoring",
+        "Session metrics"
+      ]
+    },
+    {
+      "section": "getting-started",
+      "label": "getting-started",
+      "parent": null,
+      "file": "docs/getting-started.md",
+      "articles": 1,
+      "failed": 0,
+      "thin": [],
+      "outcomes": 4,
+      "titles": [
+        "Installation and Setup"
+      ]
+    }
+  ],
+  "suggested_areas": [
+    "getting-started",
+    "building-forms",
+    "managing-responses",
+    "analytics-reporting",
+    "settings",
+    "permissions"
+  ],
+  "_suggested_areas_note": "Extended by hand beyond what the ingest derived. The ingest saw only four sections because managing-responses, notifications-email, privacy-compliance and developers had landing pages with no articles beneath them. 'managing-responses' is a real product area and 'permissions' has no docs section at all but is a real test area. Re-running ingest-docs.mjs will overwrite this \u2014 re-apply it, or the suite's areas stop resolving."
+}

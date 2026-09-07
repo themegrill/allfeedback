@@ -54,6 +54,7 @@
     "sonner-vanilla": "^0.1.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.15",
     "@tailwindcss/postcss": "^4.2.0",
     "@tanstack/eslint-plugin-query": "^5.91.4",

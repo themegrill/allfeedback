@@ -1,0 +1,81 @@
+# Files excluded from the distributed plugin.
+#
+# NOTE ON AUTHORITY: nothing in this repo currently reads this file. The release
+# zip is produced by `pnpm release` (gulpfile.mjs), which works from an explicit
+# ALLOWLIST — it copies only src/, config/, database/, languages/, the blocks'
+# block.json, allfeedback.php, uninstall.php, readme.txt and composer.*. Anything
+# not on that list is already absent from the zip.
+#
+# This file exists for the tools that DO read it — `wp dist-archive`, and the
+# WordPress.org deploy actions (10up/action-wordpress-plugin-deploy) — so that a
+# future switch to SVN-based distribution does not ship development files by
+# accident. Keep it in step with the gulp allowlist.
+
+# ── Version control / CI ──────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+.github
+.distignore
+.editorconfig
+
+# ── Dependencies and lockfiles (composer --no-dev runs at package time) ───
+node_modules
+vendor
+package.json
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+pnpm-workspace.yaml
+.npmrc
+
+# ── Build tooling and source that is compiled before packaging ───────────
+gulpfile.mjs
+webpack.config.js
+postcss.config.js
+tsconfig.json
+tsconfig.app.json
+tsconfig.node.json
+scripts
+build
+release
+resources/styles
+resources/scripts
+
+# ── QA: Playwright suite and the claudegrill working directory ────────────
+tests
+playwright.config.ts
+playwright-report
+blob-report
+test-results
+.playwright
+.themegrill-qa
+
+# ── Linting and static analysis ───────────────────────────────────────────
+phpcs.xml.dist
+.prettierrc
+.prettierignore
+.phpunit.result.cache
+
+# ── Agent / editor tooling ────────────────────────────────────────────────
+.claude
+.claudeignore
+CLAUDE.md
+.tanstack
+.vscode
+.idea
+
+# ── WordPress.org assets: uploaded to SVN /assets, never inside the plugin ─
+.wordpress-org
+
+# ── Docs that are not shipped (readme.txt IS shipped) ─────────────────────
+README.md
+
+# ── Local / OS noise ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+*.zip
+.env
+.env.local
+.env.*.local
