@@ -2,6 +2,7 @@
 node_modules/
 vendor/
 release/
+build/
 
 # Package manager lockfiles (regenerated on install)
 pnpm-lock.yaml
@@ -40,6 +41,13 @@ Thumbs.db
 # PHP compiled container cache
 cache/
 tmp/
+.phpunit.result.cache
+
+# TanStack Router dev artefacts
+.tanstack/
+
+# Packaged plugin zips
+*.zip
 
 # Logs
 *.log
@@ -47,3 +55,13 @@ npm-debug.log*
 
 # Claude Code developer-local settings (never commit)
 .claude/settings.local.json
+
+# Playwright e2e output (see tests/e2e/)
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/
+
+# QA raw docs cache — 2 MB of re-fetchable scraped HTML. The digested
+# .themegrill-qa/docs/*.md and docs-index.json ARE tracked; this is not.
+.themegrill-qa/.docs-cache/

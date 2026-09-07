@@ -1,0 +1,85 @@
+{
+  "runner": "playwright",
+  "package_manager": "pnpm",
+  "install": "pnpm install --frozen-lockfile",
+  "command": "pnpm exec playwright test",
+  "config": "playwright.config.ts",
+  "spec_dir": "tests/e2e/specs",
+  "spec_extension": ".spec.ts",
+  "json_report": "test-results/results.json",
+  "env": {
+    "base_url": "ALLFEEDBACK_BASE_URL",
+    "admin_user": "ALLFEEDBACK_ADMIN_USER",
+    "admin_pass": "ALLFEEDBACK_ADMIN_PASS"
+  },
+  "tiers": {
+    "fresh": "@fresh",
+    "demo": "@demo"
+  },
+  "area_paths": {
+    "getting-started": [
+      "src/Plugin.php",
+      "src/Admin/**",
+      "src/API/Controllers/V1/WizardController.php",
+      "src/API/Controllers/V1/BootstrapController.php",
+      "src/API/Controllers/V1/AboutController.php",
+      "database/migrations/**",
+      "src/Infrastructure/Database/Migrat*.php",
+      "src/CLI/**",
+      "resources/scripts/admin/pages/wizard/**",
+      "resources/scripts/admin/pages/about/**",
+      "resources/scripts/admin/api/wizard.ts",
+      "resources/scripts/admin/api/about.ts"
+    ],
+    "building-forms": [
+      "src/Domain/Survey/**",
+      "src/Application/Survey/**",
+      "src/API/Controllers/V1/SurveysController.php",
+      "src/API/Controllers/V1/SurveyStateController.php",
+      "src/API/Controllers/V1/ContentSearchController.php",
+      "src/Frontend/**",
+      "src/Core/I18n/**",
+      "src/Infrastructure/Database/Repositories/WpdbSurveyRepository.php",
+      "resources/scripts/admin/pages/forms/**",
+      "resources/scripts/admin/api/surveys.ts",
+      "resources/scripts/admin/data/templates/**",
+      "resources/scripts/frontend/**",
+      "resources/scripts/blocks/**"
+    ],
+    "managing-responses": [
+      "src/Domain/Response/**",
+      "src/Application/Response/**",
+      "src/API/Controllers/V1/ResponsesController.php",
+      "src/API/Controllers/V1/SubmitController.php",
+      "src/Infrastructure/Database/Repositories/WpdbResponseRepository.php",
+      "src/Infrastructure/Mail/**",
+      "resources/scripts/admin/pages/responses/**"
+    ],
+    "analytics-reporting": [
+      "src/Domain/Analytics/**",
+      "src/Application/Analytics/**",
+      "src/API/Controllers/V1/AnalyticsController.php",
+      "src/API/Controllers/V1/FormAnalyticsController.php",
+      "src/Infrastructure/Database/Repositories/WpdbSurveySessionRepository.php",
+      "resources/scripts/admin/pages/analytics/**",
+      "resources/scripts/admin/api/analytics.ts"
+    ],
+    "settings": [
+      "src/Core/Settings/**",
+      "src/API/Controllers/V1/SettingsController.php",
+      "uninstall.php",
+      "resources/scripts/admin/pages/settings/**",
+      "resources/scripts/admin/api/settings.ts"
+    ],
+    "permissions": [
+      "src/API/RestController.php",
+      "src/Core/RoleManager.php",
+      "src/API/Controllers/V1/DevToolsController.php",
+      "src/API/Controllers/V1/LogsController.php",
+      "src/Support/Logger.php",
+      "resources/scripts/admin/pages/tools/**",
+      "resources/scripts/admin/api/logs.ts"
+    ]
+  },
+  "_area_paths_note": "Proposed by /claudegrill:setup, mechanically validated (no dead globs), NOT ratified by a maintainer. Cross-cutting code is left unmapped ON PURPOSE so a change to it falls back to the full tier: config/ (DI wiring), src/Core/{Container,Events,Jobs,Cache,Features,Exceptions}, src/Support/ (except Logger), src/Modules/, src/Traits/ and shared admin components all affect every area. Narrowing those would trade coverage for speed."
+}
