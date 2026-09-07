@@ -5,7 +5,6 @@ release/
 build/
 
 # Package manager lockfiles (regenerated on install)
-pnpm-lock.yaml
 package-lock.json
 yarn.lock
 

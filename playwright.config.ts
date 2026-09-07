@@ -22,9 +22,7 @@ export default defineConfig({
 	timeout: 60_000,
 	expect: { timeout: 15_000 },
 
-	reporter: process.env.CI
-		? [['list'], ['json', { outputFile: 'test-results/results.json' }]]
-		: [['list'], ['json', { outputFile: 'test-results/results.json' }]],
+	reporter: [['list'], ['json', { outputFile: 'test-results/results.json' }]],
 
 	use: {
 		baseURL,
