@@ -83,6 +83,7 @@ interface PreviewPanelProps {
 	surveyId?: number;
 	surveyStatus?: SurveyStatus;
 	activeSectionIndex?: number;
+	onActiveSectionChange?: (sectionIndex: number) => void;
 }
 
 const DEVICES: { value: PreviewDevice; Icon: typeof Monitor; label: string }[] =
@@ -454,6 +455,7 @@ const PreviewPanel = ({
 	surveyId,
 	surveyStatus,
 	activeSectionIndex,
+	onActiveSectionChange,
 }: PreviewPanelProps) => {
 	const steps = activeSections(sections);
 	const totalSteps = steps.length;
@@ -483,7 +485,7 @@ const PreviewPanel = ({
 
 	const sessionIdRef = useRef<string>(genId());
 
-	const [viewMode, setViewMode] = useState<PreviewView>('page');
+	const [viewMode, setViewMode] = useState<PreviewView>('widget');
 	const [isMinimized, setIsMinimized] = useState(false);
 	const [isClosed, setIsClosed] = useState(false);
 	const [fieldValues, setFieldValues] = useState<
@@ -499,6 +501,14 @@ const PreviewPanel = ({
 
 	const stepIndex = Math.min(currentStep, Math.max(0, totalSteps - 1));
 	const isLastStep = stepIndex === totalSteps - 1;
+
+	// User-driven navigation in the preview — mirror it in the builder.
+	const goToStep = (step: number) => {
+		setCurrentStep(step);
+		const id = steps[step]?.id;
+		const sectionIdx = sections.findIndex((s) => s.id === id);
+		if (sectionIdx >= 0) onActiveSectionChange?.(sectionIdx);
+	};
 	const currentFields = steps[stepIndex]?.fields ?? [];
 
 	const submitMutation = useMutation({
@@ -530,7 +540,16 @@ const PreviewPanel = ({
 		setSubmitError('');
 		setConsentChecked(false);
 		setConsentError('');
-		setCurrentStep(0);
+		const activeId =
+			activeSectionIndex != null && activeSectionIndex >= 0
+				? sections[activeSectionIndex]?.id
+				: undefined;
+		setCurrentStep(
+			Math.max(
+				0,
+				activeSections(sections).findIndex((s) => s.id === activeId),
+			),
+		);
 		setIsSubmitted(false);
 	}, [
 		allFields(sections)
@@ -579,7 +598,7 @@ const PreviewPanel = ({
 			return;
 		}
 		setFieldErrors({});
-		setCurrentStep((s) => s + 1);
+		goToStep(stepIndex + 1);
 	};
 
 	const handleConsentChange = (checked: boolean) => {
@@ -685,7 +704,7 @@ const PreviewPanel = ({
 		onNext: handleNext,
 		onBack: () => {
 			setFieldErrors({});
-			setCurrentStep((s) => s - 1);
+			goToStep(stepIndex - 1);
 		},
 		onSubmit: handleSubmit,
 		onResubmit: () => {
@@ -707,17 +726,17 @@ const PreviewPanel = ({
 	const adminPrev = () => {
 		if (isSubmitted) {
 			setIsSubmitted(false);
-			setCurrentStep(totalSteps - 1);
+			goToStep(totalSteps - 1);
 		} else if (currentStep > 0) {
 			setFieldErrors({});
-			setCurrentStep((s) => s - 1);
+			goToStep(stepIndex - 1);
 		}
 	};
 
 	const adminNext = () => {
 		if (!isSubmitted && stepIndex < totalSteps - 1) {
 			setFieldErrors({});
-			setCurrentStep((s) => s + 1);
+			goToStep(stepIndex + 1);
 		} else if (!isSubmitted && stepIndex === totalSteps - 1) {
 			setIsSubmitted(true);
 		}
@@ -725,6 +744,36 @@ const PreviewPanel = ({
 
 	const adminCanPrev = hasSteps && adminCurrentPage > 0;
 	const adminCanNext = hasSteps && !isSubmitted;
+
+	const pager = hasSteps ? (
+		<div className="flex items-center gap-0.5">
+			<Tooltip content={__('Previous page', 'allfeedback')}>
+				<button
+					type="button"
+					onClick={adminPrev}
+					disabled={!adminCanPrev}
+					className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
+				>
+					<ChevronLeft className="size-5" />
+				</button>
+			</Tooltip>
+			<span className="text-muted-foreground min-w-[52px] text-center text-sm font-medium">
+				{isSubmitted
+					? __('Thanks', 'allfeedback')
+					: `${stepIndex + 1} / ${adminTotalPages}`}
+			</span>
+			<Tooltip content={__('Next page', 'allfeedback')}>
+				<button
+					type="button"
+					onClick={adminNext}
+					disabled={!adminCanNext}
+					className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
+				>
+					<ChevronRight className="size-5" />
+				</button>
+			</Tooltip>
+		</div>
+	) : null;
 
 	return (
 		<div className="flex h-full flex-col bg-white">
@@ -747,20 +796,6 @@ const PreviewPanel = ({
 					<div className="border-border/60 flex items-center rounded-lg border p-0.5">
 						<button
 							type="button"
-							onClick={() => setViewMode('page')}
-							style={{ fontSize: '12px' }}
-							className={cn(
-								'flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors',
-								viewMode === 'page'
-									? 'bg-primary/10 text-primary'
-									: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-							)}
-						>
-							<Globe className="size-3.5" />
-							{__('Page', 'allfeedback')}
-						</button>
-						<button
-							type="button"
 							onClick={() => setViewMode('widget')}
 							style={{ fontSize: '12px' }}
 							className={cn(
@@ -772,6 +807,20 @@ const PreviewPanel = ({
 						>
 							<MessageSquare className="size-3.5" />
 							{__('Widget', 'allfeedback')}
+						</button>
+						<button
+							type="button"
+							onClick={() => setViewMode('page')}
+							style={{ fontSize: '12px' }}
+							className={cn(
+								'flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors',
+								viewMode === 'page'
+									? 'bg-primary/10 text-primary'
+									: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+							)}
+						>
+							<Globe className="size-3.5" />
+							{__('Page', 'allfeedback')}
 						</button>
 					</div>
 				</div>
@@ -1007,6 +1056,9 @@ const PreviewPanel = ({
 							onMinimize={() => {}}
 							onClose={() => {}}
 						/>
+						{pager && (
+							<div className="mt-3 flex justify-center">{pager}</div>
+						)}
 					</div>
 				</div>
 			)}
@@ -1037,35 +1089,7 @@ const PreviewPanel = ({
 					))}
 				</div>
 				<div className="flex flex-1 items-center justify-end">
-					{hasSteps && (
-						<div className="flex items-center gap-0.5">
-							<Tooltip content={__('Previous page', 'allfeedback')}>
-								<button
-									type="button"
-									onClick={adminPrev}
-									disabled={!adminCanPrev}
-									className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
-								>
-									<ChevronLeft className="size-5" />
-								</button>
-							</Tooltip>
-							<span className="text-muted-foreground min-w-[52px] text-center text-sm font-medium">
-								{isSubmitted
-									? __('Thanks', 'allfeedback')
-									: `${stepIndex + 1} / ${adminTotalPages}`}
-							</span>
-							<Tooltip content={__('Next page', 'allfeedback')}>
-								<button
-									type="button"
-									onClick={adminNext}
-									disabled={!adminCanNext}
-									className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
-								>
-									<ChevronRight className="size-5" />
-								</button>
-							</Tooltip>
-						</div>
-					)}
+					{viewMode === 'page' && pager}
 				</div>
 			</div>
 		</div>

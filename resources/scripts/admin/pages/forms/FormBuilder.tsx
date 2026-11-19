@@ -394,13 +394,14 @@ const FormBuilder = () => {
 	const [settingsProgress, setSettingsProgress] = useState(0);
 	const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
 	const [previewWidth, setPreviewWidth] = useState(() => {
-		const saved = localStorage.getItem('allfeedback_preview_width');
+		const saved = localStorage.getItem('allfeedback_preview_width_v2');
 		if (saved) {
 			const n = parseInt(saved, 10);
 			if (!isNaN(n) && n >= 280)
 				return Math.min(n, Math.round(window.innerWidth * 0.72));
 		}
-		return Math.round(window.innerWidth * 0.3);
+		const adminMenu = document.getElementById('adminmenuwrap')?.offsetWidth ?? 0;
+		return Math.max(280, Math.round((window.innerWidth - adminMenu) * 0.4));
 	});
 	const [publishMenuOpen, setPublishMenuOpen] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -581,7 +582,7 @@ const FormBuilder = () => {
 					Math.min(Math.round(window.innerWidth * 0.72), startWidth + delta),
 				);
 				setPreviewWidth(next);
-				localStorage.setItem('allfeedback_preview_width', String(next));
+				localStorage.setItem('allfeedback_preview_width_v2', String(next));
 			};
 			const onUp = () => {
 				document.removeEventListener('mousemove', onMove);
@@ -997,6 +998,7 @@ const FormBuilder = () => {
 							<BuilderCanvas
 								sections={sections}
 								onSectionsChange={handleSectionsChange}
+								activeSectionIndex={activeSectionIndex}
 								onActiveSectionChange={setActiveSectionIndex}
 								onScrollChange={(scrolled, progress) => {
 									setCanvasScrolled(scrolled);
@@ -1055,6 +1057,7 @@ const FormBuilder = () => {
 						surveyId={formId ?? undefined}
 						surveyStatus={surveyStatus}
 						activeSectionIndex={activeSectionIndex}
+						onActiveSectionChange={setActiveSectionIndex}
 					/>
 				</div>
 			</div>
