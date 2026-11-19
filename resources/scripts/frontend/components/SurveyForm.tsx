@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { visibleSections } from '@/shared/conditions';
 import { activeSections, normalizeSettings, parseSections, trackEvent } from '../utils';
 import type { AllfbConfig, Survey } from '../types';
 import { FieldPreview } from './FieldPreview';
@@ -30,9 +31,8 @@ interface SurveyFormProps {
 }
 
 export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, alreadySubmitted = false }: SurveyFormProps ) => {
-	const sections    = activeSections( parseSections( survey.form_schema ) );
+	const allSections = activeSections( parseSections( survey.form_schema ) );
 	const ss          = normalizeSettings( survey.settings );
-	const totalSteps  = sections.length;
 
 	const requireConsent  = cfg.settings.require_consent ?? false;
 	const consentText      = ( cfg.settings.consent_text || '' ).trim() ||
@@ -49,12 +49,15 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 
 	const hasStartedRef = useRef( false );
 
+	const sections   = visibleSections( allSections, fieldValues );
+	const totalSteps = sections.length;
+
 	if ( sections.length === 0 ) {
 		return <p className="allfb-panel__placeholder">This survey has no questions yet.</p>;
 	}
 
 	const isLastStep      = stepIndex === totalSteps - 1;
-	const currentSection  = sections[ stepIndex ];
+	const currentSection  = sections[ Math.min( stepIndex, totalSteps - 1 ) ];
 
 	const handleChange = ( fieldId: string, value: string | string[] ) => {
 		setFieldValues( ( prev ) => ( { ...prev, [ fieldId ]: value } ) );
@@ -112,8 +115,10 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 		setSubmitError( '' );
 
 		const responseData: Record<string, string | string[]> = {};
-		sections.forEach( ( s ) => s.fields.forEach( ( f ) => {
-			responseData[ f.id ] = fieldValues[ f.id ] ?? ( f.type === 'checkboxes' ? [] : '' );
+		const visibleIds = new Set( sections.flatMap( ( s ) => s.fields.map( ( f ) => f.id ) ) );
+		allSections.forEach( ( s ) => s.fields.forEach( ( f ) => {
+			const empty = f.type === 'checkboxes' ? [] : '';
+			responseData[ f.id ] = visibleIds.has( f.id ) ? ( fieldValues[ f.id ] ?? empty ) : empty;
 		} ) );
 
 		const allFields = sections.flatMap( ( s ) => s.fields );

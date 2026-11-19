@@ -1,3 +1,4 @@
+import type { ConditionRule } from '@/shared/conditions';
 import type { FormSection, NormalizedSettings, SurveyField, SurveySettings } from './types';
 
 export async function trackEvent(
@@ -54,6 +55,7 @@ function normalizeField( raw: unknown ): SurveyField {
 		...( settings.scaleMax       !== undefined && { scaleMax:       settings.scaleMax       as number } ),
 		...( settings.scaleLowLabel  !== undefined && { scaleLowLabel:  settings.scaleLowLabel  as string } ),
 		...( settings.scaleHighLabel !== undefined && { scaleHighLabel: settings.scaleHighLabel as string } ),
+		...( settings.condition      !== undefined && { condition:      settings.condition      as ConditionRule } ),
 	} as SurveyField;
 }
 

@@ -1,3 +1,5 @@
+import type { ConditionRule } from '@/shared/conditions';
+
 export interface WidgetState {
 	impressions:  number;
 	submitted:    boolean;
@@ -54,6 +56,7 @@ export interface SurveyField {
 	scaleMax?:       number;
 	scaleLowLabel?:  string;
 	scaleHighLabel?: string;
+	condition?:      ConditionRule;
 }
 
 export interface FormSection {

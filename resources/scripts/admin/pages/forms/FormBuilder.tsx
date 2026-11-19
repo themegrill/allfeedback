@@ -35,6 +35,7 @@ import PreviewPanel from './builder/PreviewPanel';
 import SettingsPanel from './builder/SettingsPanel';
 import StylingPanel from './builder/StylingPanel';
 import type {
+	FieldCondition,
 	BuilderTab,
 	FieldType,
 	FormField,
@@ -97,6 +98,9 @@ const deserializeFormSchema = (
 				}),
 				...(field.settings.scaleHighLabel !== undefined && {
 					scaleHighLabel: field.settings.scaleHighLabel as string,
+				}),
+				...(field.settings.condition !== undefined && {
+					condition: field.settings.condition as FieldCondition,
 				}),
 			}),
 		),
@@ -271,6 +275,9 @@ const serializeFormSchema = (sections: FormSection[]): SurveyFormSchema => ({
 				}),
 				...(field.scaleHighLabel !== undefined && {
 					scaleHighLabel: field.scaleHighLabel,
+				}),
+				...(field.condition !== undefined && {
+					condition: field.condition,
 				}),
 			},
 		})),

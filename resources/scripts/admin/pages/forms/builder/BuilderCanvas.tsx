@@ -233,6 +233,10 @@ const BuilderCanvas = ({
 						section={section}
 						index={currentIdx}
 						sectionCount={sections.length}
+						allFieldIds={sections.flatMap((s) => s.fields.map((f) => f.id))}
+						precedingFields={sections
+							.slice(0, currentIdx)
+							.flatMap((s) => s.fields)}
 						isDragging={false}
 						isDragOver={false}
 						fieldDrag={fieldDrag}

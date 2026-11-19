@@ -1,21 +1,38 @@
 import { Tooltip } from '@/admin/components/Tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
+import { cn, htmlToText } from '@/lib/utils';
 import PlaceholderExtension from '@tiptap/extension-placeholder';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import {
+	Check,
 	ChevronDown,
 	Copy,
+	GitBranch,
 	GripVertical,
 	Plus,
 	Trash2,
+	TriangleAlert,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { FIELD_TYPES } from './fieldTypes';
-import type { FormField } from './types';
+import {
+	isAnswerBroken,
+	isConditionActive,
+	isConditionBroken,
+	NUMERIC_FIELD_TYPES,
+	type ConditionOperator,
+} from '@/shared/conditions';
+import type { FieldCondition, FormField } from './types';
 
 const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
 	if (e.key === 'Enter' || e.key === 'Escape') {
@@ -405,6 +422,269 @@ const NpsConfig = () => (
 	</div>
 );
 
+const getConditionValues = (
+	source: FormField,
+): { value: string; label: string }[] | null => {
+	const range = (min: number, max: number) =>
+		Array.from({ length: max - min + 1 }, (_, i) => String(min + i));
+	switch (source.type) {
+		case 'star_rating':
+			return range(1, source.starRange ?? 5).map((v) => ({
+				value: v,
+				label:
+					(source.starScale ?? 'star') === 'star'
+						? `${'★'.repeat(Number(v))} (${v})`
+						: v,
+			}));
+		case 'radio':
+		case 'checkboxes':
+			return (source.options ?? [])
+				.filter((o) => o.trim() !== '')
+				.map((o) => ({ value: o, label: o }));
+		case 'scale':
+			return range(source.scaleMin ?? 0, source.scaleMax ?? 10).map((v) => ({
+				value: v,
+				label: v,
+			}));
+		case 'nps':
+			return range(0, 10).map((v) => ({ value: v, label: v }));
+		default:
+			return null;
+	}
+};
+
+const OPERATOR_LABELS: Record<ConditionOperator, string> = {
+	is: __('is', 'allfeedback'),
+	is_not: __('is not', 'allfeedback'),
+	greater_than: __('is greater than', 'allfeedback'),
+	less_than: __('is less than', 'allfeedback'),
+};
+
+const getOperators = (source: FormField | undefined): ConditionOperator[] =>
+	source && NUMERIC_FIELD_TYPES.includes(source.type)
+		? ['is', 'is_not', 'greater_than', 'less_than']
+		: ['is', 'is_not'];
+
+const ConditionConfig = ({
+	field,
+	sources,
+	allFieldIds,
+	onChange,
+}: {
+	field: FormField;
+	sources: FormField[];
+	allFieldIds: string[];
+	onChange: (f: FormField) => void;
+}) => {
+	const condition: FieldCondition = field.condition ?? {
+		enabled: false,
+		fieldId: '',
+		operator: 'is',
+		value: '',
+	};
+	const source = sources.find((f) => f.id === condition.fieldId);
+	const isQuestionBroken =
+		condition.enabled && condition.fieldId !== '' && !source;
+	const isValueBroken = isAnswerBroken(condition, source);
+	const isBroken = isQuestionBroken || isValueBroken;
+	const disabled = sources.length === 0;
+	const enabled = condition.enabled && (!disabled || isBroken);
+	const operator = condition.operator ?? 'is';
+	const operators = getOperators(source);
+	const values = source ? getConditionValues(source) : null;
+	const valueLabel =
+		source?.type === 'star_rating' && (source.starScale ?? 'star') === 'star'
+			? `${condition.value} ★`
+			: (values?.find((v) => v.value === condition.value)?.label ??
+				condition.value);
+
+	const brokenMessage = sprintf(
+		/* translators: %s: reason the condition stopped working */
+		__(
+			'Hidden: %s Select the condition again or turn off the show condition.',
+			'allfeedback',
+		),
+		isValueBroken
+			? __('the selected answer no longer exists.', 'allfeedback')
+			: allFieldIds.includes(condition.fieldId)
+			? __(
+					'this question shows up before the targeted question.',
+					'allfeedback',
+				)
+			: __('the targeted question was deleted.', 'allfeedback'),
+	);
+
+	const update = (next: Partial<FieldCondition>) =>
+		onChange({ ...field, condition: { ...condition, ...next } });
+
+	const selectSource = (id: string) => {
+		const next = sources.find((f) => f.id === id);
+		update({
+			fieldId: id,
+			value: '',
+			operator: getOperators(next).includes(operator) ? operator : 'is',
+		});
+	};
+
+	const capsule = (
+		<button
+			type="button"
+			disabled={disabled && !isBroken}
+			aria-pressed={enabled}
+			onClick={() => update({ enabled: !condition.enabled })}
+			className={cn(
+				'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-base transition-colors',
+				enabled && !isBroken
+					? 'border-border bg-primary/[0.06] text-primary'
+					: 'border-border text-foreground/80 hover:bg-muted/40',
+				disabled &&
+					!isBroken &&
+					'cursor-not-allowed opacity-50 hover:bg-transparent',
+			)}
+		>
+			<span
+				className={cn(
+					'flex size-4 items-center justify-center rounded-full border',
+					enabled && !isBroken
+						? 'border-primary bg-primary text-white'
+						: enabled
+							? 'border-muted-foreground/40 bg-muted-foreground/40 text-white'
+							: 'border-border',
+				)}
+			>
+				{enabled && <Check className="size-2.5" strokeWidth={3} />}
+			</span>
+			{__('Show Condition', 'allfeedback')}
+		</button>
+	);
+
+	return (
+		<div className="space-y-3">
+			<div className="flex flex-wrap items-center gap-3">
+				{disabled && !isBroken ? (
+					<Tooltip
+						content={__(
+							'Add a question before this one to use conditions.',
+							'allfeedback',
+						)}
+					>
+						<span className="inline-flex">{capsule}</span>
+					</Tooltip>
+				) : (
+					capsule
+				)}
+				{isBroken && (
+					<span className="inline-flex items-center gap-1.5 text-sm text-amber-700">
+						<TriangleAlert className="size-3.5 shrink-0" />
+						{brokenMessage}
+					</span>
+				)}
+			</div>
+
+			{enabled && (
+				<div
+					className={cn(
+						'border-border/60 bg-muted/30 space-y-2 rounded-lg border p-3',
+					)}
+				>
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="text-foreground/90 text-base font-medium">
+							{__('Show if', 'allfeedback')}
+						</span>
+						<Select
+							value={source ? condition.fieldId : ''}
+							onValueChange={selectSource}
+							disabled={disabled}
+						>
+							<SelectTrigger
+								className={cn(
+									'min-w-0 max-w-sm flex-1 bg-white',
+									isQuestionBroken && 'border-amber-500',
+								)}
+							>
+								<SelectValue
+									placeholder={__('Select a question', 'allfeedback')}
+								/>
+							</SelectTrigger>
+							<SelectContent className="z-[100000]">
+								{sources.map((f) => (
+									<SelectItem key={f.id} value={f.id}>
+										{htmlToText(f.label) || __('Untitled', 'allfeedback')}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Select
+							value={operator}
+							onValueChange={(v) => update({ operator: v as ConditionOperator })}
+							disabled={!source}
+						>
+							<SelectTrigger className="w-40 bg-white">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent className="z-[100000]">
+								{operators.map((op) => (
+									<SelectItem key={op} value={op}>
+										{OPERATOR_LABELS[op]}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						{values ? (
+							<Select
+								value={isValueBroken ? '' : condition.value}
+								onValueChange={(v) => update({ value: v })}
+								disabled={!source}
+							>
+								<SelectTrigger
+									className={cn(
+										'w-48 bg-white',
+										isValueBroken && 'border-amber-500',
+									)}
+								>
+									<SelectValue
+										placeholder={__('Select a value', 'allfeedback')}
+									/>
+								</SelectTrigger>
+								<SelectContent className="z-[100000]">
+									{values.map((v) => (
+										<SelectItem key={v.value} value={v.value}>
+											{v.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						) : (
+							<Input
+								onKeyDown={blurOnEnter}
+								value={condition.value}
+								onChange={(e) => update({ value: e.target.value })}
+								disabled={!source}
+								placeholder={__('Enter a value', 'allfeedback')}
+								className="!w-48 bg-white"
+							/>
+						)}
+					</div>
+					{source && condition.value !== '' && !isValueBroken && (
+						<p className="text-muted-foreground text-sm">
+							<span className="text-foreground/90 font-medium">
+								{__('Shown', 'allfeedback')}
+							</span>{' '}
+							{sprintf(
+								/* translators: 1: question label, 2: comparison such as "is" or "is greater than", 3: answer value */
+								__('when “%1$s” %2$s %3$s.', 'allfeedback'),
+								htmlToText(source.label),
+								OPERATOR_LABELS[operator],
+								valueLabel,
+							)}
+						</p>
+					)}
+				</div>
+			)}
+		</div>
+	);
+};
+
 export interface FieldEditorProps {
 	field: FormField;
 	index: number;
@@ -412,6 +692,8 @@ export interface FieldEditorProps {
 	isDragOver: boolean;
 	autoFocus?: boolean;
 	isExpanded: boolean;
+	conditionSources: FormField[];
+	allFieldIds: string[];
 	onExpand: () => void;
 	onCollapse: () => void;
 	onChange: (field: FormField) => void;
@@ -430,6 +712,8 @@ const FieldEditor = ({
 	isDragOver,
 	autoFocus,
 	isExpanded,
+	conditionSources,
+	allFieldIds,
 	onExpand,
 	onCollapse,
 	onChange,
@@ -487,7 +771,30 @@ const FieldEditor = ({
 	};
 
 	const cardRef = useRef<HTMLDivElement>(null);
-	const config = renderConfig();
+	const typeConfigEl = renderConfig();
+	const config = (
+		<>
+			{typeConfigEl}
+			<ConditionConfig
+				field={field}
+				sources={conditionSources}
+				allFieldIds={allFieldIds}
+				onChange={onChange}
+			/>
+		</>
+	);
+	const conditionSource = conditionSources.find(
+		(f) => f.id === field.condition?.fieldId,
+	);
+	const hasCondition =
+		isConditionActive(
+			field.condition,
+			conditionSources.map((f) => f.id),
+		) && !isAnswerBroken(field.condition, conditionSource);
+	const hasBrokenCondition = isConditionBroken(
+		field.condition,
+		conditionSources,
+	);
 
 	return (
 		<div
@@ -514,7 +821,9 @@ const FieldEditor = ({
 				isDragging && 'scale-[0.98] opacity-40',
 				isDragOver && !isDragging
 					? 'border-primary/40 shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]'
-					: 'border-border/60',
+					: hasBrokenCondition
+						? 'border-amber-500'
+						: 'border-border/60',
 			)}
 		>
 			<div
@@ -591,6 +900,28 @@ const FieldEditor = ({
 				</div>
 
 				<div className="ml-auto flex items-center gap-1">
+					{(hasCondition || hasBrokenCondition) && (
+						<Tooltip
+							content={
+								hasBrokenCondition
+									? __(
+											'Show condition is invalid. This question is hidden.',
+											'allfeedback',
+										)
+									: __('Has show condition', 'allfeedback')
+							}
+						>
+							<span
+								className={cn(
+									'flex size-6 items-center justify-center',
+									hasBrokenCondition ? 'text-amber-700' : 'text-primary',
+								)}
+								onClick={(e) => e.stopPropagation()}
+							>
+								<GitBranch className="size-3.5" />
+							</span>
+						</Tooltip>
+					)}
 					<div
 						onClick={(e) => e.stopPropagation()}
 						onMouseDown={(e) => e.stopPropagation()}

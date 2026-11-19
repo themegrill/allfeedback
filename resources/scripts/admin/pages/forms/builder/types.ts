@@ -7,6 +7,10 @@ export type FieldType =
 	| 'scale'
 	| 'nps';
 
+import type { ConditionRule } from '@/shared/conditions';
+
+export type FieldCondition = ConditionRule;
+
 export interface FormField {
 	id: string;
 	type: FieldType;
@@ -20,6 +24,7 @@ export interface FormField {
 	scaleMax?: number;
 	scaleLowLabel?: string;
 	scaleHighLabel?: string;
+	condition?: FieldCondition;
 }
 
 export interface FormSection {
