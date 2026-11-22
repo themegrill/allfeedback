@@ -324,7 +324,7 @@ class SurveysController extends RestController {
 			return $this->notFoundResponse( __( 'Survey', 'allfeedback' ) );
 		}
 
-		if ( ! current_user_can( 'manage_options' ) && ! $survey->getStatus()->isPublished() ) {
+		if ( ! current_user_can( 'manage_options' ) && ! $survey->isLive() ) {
 			return $this->notFoundResponse( __( 'Survey', 'allfeedback' ) );
 		}
 
@@ -973,8 +973,9 @@ class SurveysController extends RestController {
 			'settings'        => $settings !== [] ? $settings : null,
 			'styling'         => $styling !== [] ? $styling : null,
 			'status'          => $survey->getStatus()->value,
-			'conflict_reason' => $survey->getConflictReason(),
-			'response_count'  => $survey->getResponseCount(),
+			'conflict_reason'  => $survey->getConflictReason(),
+			'missing_features' => $survey->getMissingFeatures(),
+			'response_count'   => $survey->getResponseCount(),
 			'created_by'      => $survey->getCreatedBy() !== 0 ? $survey->getCreatedBy() : null,
 			'created_at'      => $survey->getCreatedAt()->format( 'Y-m-d H:i:s' ),
 			'updated_at'      => $survey->getUpdatedAt()?->format( 'Y-m-d H:i:s' ),

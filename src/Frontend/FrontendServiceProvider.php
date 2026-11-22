@@ -150,7 +150,7 @@ class FrontendServiceProvider implements ServiceProvider {
 		$repo   = $this->container->get( SurveyRepository::class );
 		$survey = $repo->findById( $survey_id );
 
-		if ( $survey === null || ! $survey->getStatus()->isPublished() ) {
+		if ( $survey === null || ! $survey->isLive() ) {
 			return '';
 		}
 

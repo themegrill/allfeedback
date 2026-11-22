@@ -141,9 +141,10 @@ class SubmitController extends RestController {
 		}
 
 		$is_draft         = $survey->getStatus()->value === 'draft';
-		$is_admin_preview = $is_draft && current_user_can( 'manage_options' );
+		$is_inactive      = [] !== $survey->getMissingFeatures();
+		$is_admin_preview = ( $is_draft || $is_inactive ) && current_user_can( 'manage_options' );
 
-		if ( ! $survey->getStatus()->isPublished() && ! $is_admin_preview ) {
+		if ( ! $survey->isLive() && ! $is_admin_preview ) {
 			$this->logger->warning(
 				'Submission rejected: survey not published.',
 				[

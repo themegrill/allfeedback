@@ -204,6 +204,49 @@ class Survey extends Entity {
 	}
 
 	/**
+	 * Add-on features this form needs, as saved by the builder in `form_schema.requires`.
+	 *
+	 * @return string[]
+	 * @since  1.1.0
+	 */
+	public function getRequiredFeatures(): array {
+		$requires = (array) ( $this->form_schema['requires'] ?? [] );
+		return array_values( array_filter( array_map( 'strval', $requires ) ) );
+	}
+
+	/**
+	 * Required add-on features that are not active right now (e.g. Pro was deactivated).
+	 *
+	 * @return string[]
+	 * @since  1.1.0
+	 */
+	public function getMissingFeatures(): array {
+		/**
+		 * Filters the add-on features that are currently active.
+		 *
+		 * Add-ons add their feature ids here, e.g. AllFeedback Pro adds 'conditional-logic'.
+		 * A form that requires a feature missing from this list is taken offline.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param string[] $features Active feature ids.
+		 */
+		$active = array_map( 'strval', (array) apply_filters( 'allfeedback_active_features', [] ) );
+
+		return array_values( array_diff( $this->getRequiredFeatures(), $active ) );
+	}
+
+	/**
+	 * Whether visitors can see and submit this form: published and every required feature active.
+	 *
+	 * @return bool
+	 * @since  1.1.0
+	 */
+	public function isLive(): bool {
+		return $this->getStatus()->isPublished() && [] === $this->getMissingFeatures();
+	}
+
+	/**
 	 * Replace the form schema and record a modification timestamp.
 	 *
 	 * @param  array<mixed> $form_schema New form schema.

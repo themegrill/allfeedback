@@ -99,7 +99,7 @@ class TargetingEngine {
 
 		$ids = [];
 		foreach ( $surveys as $survey ) {
-			if ( $this->surveyMatchesCurrentPage( $survey ) ) {
+			if ( $survey->isLive() && $this->surveyMatchesCurrentPage( $survey ) ) {
 				$ids[] = $survey->getId();
 			}
 		}

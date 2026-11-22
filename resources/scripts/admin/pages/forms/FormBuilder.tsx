@@ -31,6 +31,8 @@ import {
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import BuilderCanvas from './builder/BuilderCanvas';
+import { computeRequiredFeatures } from './builder/extensions';
+import { INACTIVE_FORM_MESSAGE } from './inactiveForm';
 import PreviewPanel from './builder/PreviewPanel';
 import SettingsPanel from './builder/SettingsPanel';
 import StylingPanel from './builder/StylingPanel';
@@ -271,8 +273,12 @@ const deserializeStyling = (
 	}),
 });
 
-const serializeFormSchema = (sections: FormSection[]): SurveyFormSchema => ({
+const serializeFormSchema = (
+	sections: FormSection[],
+	requires: string[],
+): SurveyFormSchema => ({
 	version: '1.0',
+	...(requires.length && { requires }),
 	sections: sections.map((section) => ({
 		id: section.id,
 		title: section.title,
@@ -317,6 +323,8 @@ const FormBuilder = () => {
 
 	const [surveyStatus, setSurveyStatus] = useState<SurveyStatus>('draft');
 	const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+	const [missingFeatures, setMissingFeatures] = useState<string[]>([]);
+	const requiredFeaturesRef = useRef<string[]>([]);
 
 	const submitActionRef = useRef<'publish' | 'draft' | 'trashed'>('draft');
 
@@ -330,9 +338,13 @@ const FormBuilder = () => {
 			if (!formId) return;
 			const action = submitActionRef.current;
 
+			const requires = computeRequiredFeatures(
+				value.sections,
+				requiredFeaturesRef.current,
+			);
 			const saveData: Parameters<typeof surveysApi.update>[1] = {
 				title: value.title,
-				form_schema: serializeFormSchema(value.sections),
+				form_schema: serializeFormSchema(value.sections, requires),
 				settings: serializeSettings(value.settings),
 				styling: serializeStyling(value.settings),
 			};
@@ -342,6 +354,8 @@ const FormBuilder = () => {
 			}
 
 			const updated = await surveysApi.update(formId, saveData);
+			requiredFeaturesRef.current = requires;
+			setMissingFeatures(updated.missing_features ?? []);
 			setIsDirty(false);
 			queryClient.setQueryData(surveyQuery(formId).queryKey, updated);
 
@@ -349,6 +363,7 @@ const FormBuilder = () => {
 				const published = await surveysApi.publish(formId);
 				setSurveyStatus(published.status);
 				setConflictWarning(published.conflict_reason ?? null);
+				setMissingFeatures(published.missing_features ?? []);
 				queryClient.setQueryData(surveyQuery(formId).queryKey, published);
 				void queryClient.invalidateQueries({ queryKey: ['surveys'] });
 
@@ -359,6 +374,11 @@ const FormBuilder = () => {
 							'allfeedback',
 						),
 					);
+					return;
+				}
+
+				if (published.missing_features?.length) {
+					toast.warning(INACTIVE_FORM_MESSAGE);
 					return;
 				}
 
@@ -457,6 +477,8 @@ const FormBuilder = () => {
 		};
 		setSurveyStatus(surveyData.status);
 		setConflictWarning(surveyData.conflict_reason ?? null);
+		setMissingFeatures(surveyData.missing_features ?? []);
+		requiredFeaturesRef.current = surveyData.form_schema?.requires ?? [];
 		historyRef.current = [loadedSections];
 		setHistoryIdx(0);
 
@@ -939,6 +961,18 @@ const FormBuilder = () => {
 					</div>
 				</div>
 			</header>
+
+			{missingFeatures.length > 0 && (
+				<div className="border-warning/20 bg-warning-subtle flex shrink-0 items-center gap-2 border-b px-6 py-1.5">
+					<AlertTriangle className="text-warning-foreground/60 size-3.5 shrink-0" />
+					<p className="text-warning-foreground/90 flex-1 text-xs">
+						<span className="font-semibold">
+							{__('Inactive:', 'allfeedback')}
+						</span>{' '}
+						{INACTIVE_FORM_MESSAGE}
+					</p>
+				</div>
+			)}
 
 			{conflictWarning && (
 				<div className="border-warning/20 bg-warning-subtle flex shrink-0 items-center gap-2 border-b px-6 py-1.5">

@@ -65,6 +65,7 @@ import {
 import { Tooltip as RadixTooltip } from 'radix-ui';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { INACTIVE_FORM_MESSAGE } from './inactiveForm';
 
 const STATUS_CONFIG: Record<
 	SurveyStatus,
@@ -956,7 +957,15 @@ const AllForms = () => {
 												</td>
 
 												<td className="w-24 px-4 py-5">
-													{survey.status === 'draft' &&
+													{survey.missing_features?.length ? (
+														<Tooltip content={INACTIVE_FORM_MESSAGE}>
+															<span className="border-warning/20 bg-warning-subtle text-warning-foreground inline-flex cursor-default items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium">
+																<span className="bg-warning size-1.5 rounded-full" />
+																{__('Inactive', 'allfeedback')}
+																<AlertTriangle className="size-3 shrink-0" />
+															</span>
+														</Tooltip>
+													) : survey.status === 'draft' &&
 													survey.conflict_reason ? (
 														<Tooltip
 															content={__(

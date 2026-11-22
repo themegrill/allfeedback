@@ -12,6 +12,8 @@ export type Survey = {
 	styling:         Record<string, unknown> | null;
 	status:          SurveyStatus;
 	conflict_reason: string | null;
+	/** Add-on features this form needs that aren't active; the form is offline while non-empty. */
+	missing_features?: string[];
 	response_count:  number;
 	created_by:      number;
 	created_at:      string;
@@ -33,8 +35,10 @@ export type SurveyFormSchemaSection = {
 };
 
 export type SurveyFormSchema = {
-	version:  string;
-	sections: SurveyFormSchemaSection[];
+	version:   string;
+	sections:  SurveyFormSchemaSection[];
+	/** Add-on features the form uses, e.g. 'conditional-logic'. */
+	requires?: string[];
 };
 
 export type SurveyListResponse = PaginatedMeta & {

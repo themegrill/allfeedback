@@ -38,7 +38,7 @@ class ValidateSurveyIsActive implements PipeInterface {
 	public function execute( ResponseContext $context, \Closure $next ): mixed {
 		$is_admin = $context->dto->user_id > 0 && user_can( $context->dto->user_id, 'manage_options' );
 
-		if ( ! $context->survey->getStatus()->isPublished() && ! $is_admin ) {
+		if ( ! $context->survey->isLive() && ! $is_admin ) {
 			throw ValidationException::withErrors(
 				[ 'survey' => esc_html__( 'This survey is not currently accepting responses.', 'allfeedback' ) ]
 			);
