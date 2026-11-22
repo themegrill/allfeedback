@@ -67,3 +67,11 @@ declare const __ALLFB_ADMIN__: {
 
 	wizardStatus: 'not_started' | 'pending_redirect' | 'initiated' | 'completed';
 };
+
+/** Shared with add-ons such as AllFeedback Pro — see admin/index.tsx. */
+interface Window {
+	AllFeedback?: {
+		components?: Record<string, unknown>;
+		utils?: Record<string, unknown>;
+	};
+}

@@ -281,9 +281,22 @@ class FrontendServiceProvider implements ServiceProvider {
 			]
 		);
 
+		/**
+		 * Filters extra script handles the feedback widget depends on.
+		 *
+		 * Add-ons register their script and add its handle here so it loads first
+		 * and can hook into the widget with `wp.hooks.addFilter()`.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param string[] $deps Script handles.
+		 */
+		$frontend_deps = (array) apply_filters( 'allfeedback_frontend_script_dependencies', [] );
+
 		$this->asset_manager->enqueueScript(
 			handle:   'frontend',
 			src:      'frontend.js',
+			deps:     $frontend_deps,
 			localize: [
 				'object_name' => '__ALLFB__',
 				'data'        => $frontend_data,

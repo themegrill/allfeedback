@@ -54,6 +54,7 @@ export interface SurveyField {
 	scaleMax?:       number;
 	scaleLowLabel?:  string;
 	scaleHighLabel?: string;
+	settings?:       Record<string, unknown>;
 }
 
 export interface FormSection {

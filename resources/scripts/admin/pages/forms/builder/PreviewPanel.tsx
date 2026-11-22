@@ -65,6 +65,7 @@ const PenLineIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 import { settingsQuery } from '@/admin/queries/settings';
+import { filterVisibleSections } from '@/shared/extensions';
 import { toast } from 'sonner';
 import type {
 	FormField,
@@ -457,9 +458,6 @@ const PreviewPanel = ({
 	activeSectionIndex,
 	onActiveSectionChange,
 }: PreviewPanelProps) => {
-	const steps = activeSections(sections);
-	const totalSteps = steps.length;
-	const hasSteps = totalSteps > 0;
 	const maxW = DEVICE_MAX_W[device];
 	const pageMaxW = DEVICE_PAGE_W[device];
 	const isMobile = device === 'mobile';
@@ -498,6 +496,10 @@ const PreviewPanel = ({
 	const [currentStep, setCurrentStep] = useState(0);
 	const [isSubmitted, setIsSubmitted] = useState(false);
 	const [hasSubmitted, setHasSubmitted] = useState(false);
+
+	const steps = activeSections(filterVisibleSections(sections, fieldValues));
+	const totalSteps = steps.length;
+	const hasSteps = totalSteps > 0;
 
 	const stepIndex = Math.min(currentStep, Math.max(0, totalSteps - 1));
 	const isLastStep = stepIndex === totalSteps - 1;
@@ -547,7 +549,7 @@ const PreviewPanel = ({
 		setCurrentStep(
 			Math.max(
 				0,
-				activeSections(sections).findIndex((s) => s.id === activeId),
+				steps.findIndex((s) => s.id === activeId),
 			),
 		);
 		setIsSubmitted(false);
@@ -562,7 +564,7 @@ const PreviewPanel = ({
 		if (activeSectionIndex == null || activeSectionIndex < 0) return;
 		const targetId = sections[activeSectionIndex]?.id;
 		if (!targetId) return;
-		const targetStep = activeSections(sections).findIndex(
+		const targetStep = steps.findIndex(
 			(s) => s.id === targetId,
 		);
 		if (targetStep >= 0 && targetStep !== currentStep) {
@@ -632,11 +634,15 @@ const PreviewPanel = ({
 				typeof scoreRaw === 'string' && scoreRaw !== ''
 					? Number(scoreRaw)
 					: undefined;
+			const visibleIds = new Set(allFields(steps).map((f) => f.id));
 			const responseData: Record<string, unknown> = Object.fromEntries(
-				allFormFields.map((f) => [
-					f.id,
-					fieldValues[f.id] ?? (f.type === 'checkboxes' ? [] : ''),
-				]),
+				allFormFields.map((f) => {
+					const empty = f.type === 'checkboxes' ? [] : '';
+					return [
+						f.id,
+						visibleIds.has(f.id) ? (fieldValues[f.id] ?? empty) : empty,
+					];
+				}),
 			);
 			submitMutation.mutate({
 				nonce: __ALLFB_ADMIN__.submitNonce,

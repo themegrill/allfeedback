@@ -14,6 +14,7 @@ import {
 	Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { getFieldExtensions, type FieldExtensionProps } from './extensions';
 import { FIELD_TYPES } from './fieldTypes';
 import type { FormField } from './types';
 
@@ -412,6 +413,8 @@ export interface FieldEditorProps {
 	isDragOver: boolean;
 	autoFocus?: boolean;
 	isExpanded: boolean;
+	precedingFields: FormField[];
+	allFields: FormField[];
 	onExpand: () => void;
 	onCollapse: () => void;
 	onChange: (field: FormField) => void;
@@ -430,6 +433,8 @@ const FieldEditor = ({
 	isDragOver,
 	autoFocus,
 	isExpanded,
+	precedingFields,
+	allFields,
 	onExpand,
 	onCollapse,
 	onChange,
@@ -487,7 +492,27 @@ const FieldEditor = ({
 	};
 
 	const cardRef = useRef<HTMLDivElement>(null);
-	const config = renderConfig();
+	const extensions = getFieldExtensions();
+	const extensionProps: FieldExtensionProps = {
+		field,
+		precedingFields,
+		allFields,
+		onChange,
+	};
+	const panels = extensions.filter((ext) => ext.Panel);
+	const typeConfigEl = renderConfig();
+	const config =
+		typeConfigEl || panels.length ? (
+			<>
+				{typeConfigEl}
+				{panels.map(({ name, Panel }) =>
+					Panel ? <Panel key={name} {...extensionProps} /> : null,
+				)}
+			</>
+		) : null;
+	const hasWarning = extensions.some(
+		(ext) => ext.getStatus?.(extensionProps) === 'warning',
+	);
 
 	return (
 		<div
@@ -514,7 +539,9 @@ const FieldEditor = ({
 				isDragging && 'scale-[0.98] opacity-40',
 				isDragOver && !isDragging
 					? 'border-primary/40 shadow-[0_0_0_3px_hsl(var(--primary)/0.08)]'
-					: 'border-border/60',
+					: hasWarning
+						? 'border-amber-500'
+						: 'border-border/60',
 			)}
 		>
 			<div
@@ -591,6 +618,17 @@ const FieldEditor = ({
 				</div>
 
 				<div className="ml-auto flex items-center gap-1">
+					{extensions.map(({ name, HeaderBadge }) =>
+						HeaderBadge ? (
+							<span
+								key={name}
+								className="flex items-center"
+								onClick={(e) => e.stopPropagation()}
+							>
+								<HeaderBadge {...extensionProps} />
+							</span>
+						) : null,
+					)}
 					<div
 						onClick={(e) => e.stopPropagation()}
 						onMouseDown={(e) => e.stopPropagation()}

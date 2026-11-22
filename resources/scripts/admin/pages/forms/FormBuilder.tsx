@@ -61,6 +61,29 @@ const TABS: {
 	{ value: 'settings', label: __('Settings', 'allfeedback'), Icon: Settings2 },
 ];
 
+const CORE_SETTING_KEYS = [
+	'placeholder',
+	'options',
+	'starScale',
+	'starRange',
+	'scaleMin',
+	'scaleMax',
+	'scaleLowLabel',
+	'scaleHighLabel',
+];
+
+/** Settings saved by extensions (anything that isn't a core field setting). */
+const extraSettings = (
+	settings: Record<string, unknown>,
+): { settings?: Record<string, unknown> } => {
+	const extra = Object.fromEntries(
+		Object.entries(settings ?? {}).filter(
+			([key]) => !CORE_SETTING_KEYS.includes(key),
+		),
+	);
+	return Object.keys(extra).length ? { settings: extra } : {};
+};
+
 const deserializeFormSchema = (
 	schema: SurveyFormSchema | null,
 ): FormSection[] => {
@@ -98,6 +121,7 @@ const deserializeFormSchema = (
 				...(field.settings.scaleHighLabel !== undefined && {
 					scaleHighLabel: field.settings.scaleHighLabel as string,
 				}),
+				...extraSettings(field.settings),
 			}),
 		),
 	}));
@@ -258,6 +282,7 @@ const serializeFormSchema = (sections: FormSection[]): SurveyFormSchema => ({
 			label: field.label,
 			required: field.required,
 			settings: {
+				...field.settings,
 				...(field.placeholder !== undefined && {
 					placeholder: field.placeholder,
 				}),

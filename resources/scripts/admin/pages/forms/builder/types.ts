@@ -20,6 +20,8 @@ export interface FormField {
 	scaleMax?: number;
 	scaleLowLabel?: string;
 	scaleHighLabel?: string;
+	/** Settings added by extensions; saved and loaded untouched. */
+	settings?: Record<string, unknown>;
 }
 
 export interface FormSection {

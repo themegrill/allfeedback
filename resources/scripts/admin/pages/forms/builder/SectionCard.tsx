@@ -18,6 +18,8 @@ interface SectionCardProps {
 	section: FormSection;
 	index: number;
 	sectionCount: number;
+	precedingFields: FormField[];
+	allFields: FormField[];
 	isDragging: boolean;
 	isDragOver: boolean;
 	fieldDrag: FieldPos | null;
@@ -40,6 +42,8 @@ interface SectionCardProps {
 const SectionCard = ({
 	section,
 	index,
+	precedingFields,
+	allFields,
 	isDragging,
 	isDragOver,
 	fieldDrag,
@@ -206,6 +210,11 @@ const SectionCard = ({
 												fieldDrag?.fieldIdx === fieldIdx
 											)
 										}
+										precedingFields={[
+											...precedingFields,
+											...section.fields.slice(0, fieldIdx),
+										]}
+										allFields={allFields}
 										autoFocus={newFieldId === field.id}
 										isExpanded={expandedFieldId === field.id}
 										onExpand={() => setExpandedFieldId(field.id)}
