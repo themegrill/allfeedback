@@ -71,11 +71,21 @@ const Collapse = ({
 	</div>
 );
 
-/** A section an add-on adds to the bottom of this page. It saves its own values. */
+/** Props free gives an add-on section so it saves with the page's Save button. */
+export interface AdvancedSettingsSectionProps {
+	/** Saved settings, as returned by GET /settings. */
+	settings: Settings | undefined;
+	/** This section's unsaved changes, or undefined when there are none. */
+	patch: Record<string, unknown> | undefined;
+	/** Stage changes as a partial settings object (merged into Save), or null to discard them. */
+	setPatch: (patch: Record<string, unknown> | null) => void;
+}
+
+/** A section an add-on adds to the bottom of this page. */
 interface AdvancedSettingsSection {
 	name: string;
 	title: string;
-	Component: ComponentType;
+	Component: ComponentType<AdvancedSettingsSectionProps>;
 }
 
 const getExtensionSections = (): AdvancedSettingsSection[] => {
@@ -395,15 +405,25 @@ const AdvancedSettings = () => {
 					</Row>
 				</div>
 
-				{extensionSections.map(({ name, title, Component }) => (
-					<div key={name}>
-						<div className="border-border/50 my-6 border-t" />
-						<div className="space-y-3">
-							<SectionLabel>{title}</SectionLabel>
-							<Component />
+				{extensionSections.map(({ name, title, Component }) => {
+					const key = `extension:${name}`;
+					return (
+						<div key={name}>
+							<div className="border-border/50 my-6 border-t" />
+							<div className="space-y-3">
+								<SectionLabel>{title}</SectionLabel>
+								<Component
+									settings={data}
+									patch={patches[key]}
+									setPatch={(patch) => {
+										setPatch(key, patch);
+										setDirty(key, patch !== null);
+									}}
+								/>
+							</div>
 						</div>
-					</div>
-				))}
+					);
+				})}
 			</div>
 		</div>
 	);
