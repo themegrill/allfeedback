@@ -454,6 +454,7 @@ const FieldEditor = ({
 		switch (field.type) {
 			case 'short_text':
 			case 'long_text':
+			case 'email':
 				return (
 					<TextFieldConfig
 						field={field}

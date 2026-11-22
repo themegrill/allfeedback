@@ -43,7 +43,7 @@ export interface AllfbConfig {
 
 export interface SurveyField {
 	id:              string;
-	type:            'short_text' | 'long_text' | 'radio' | 'checkboxes' | 'star_rating' | 'scale' | 'nps';
+	type:            'short_text' | 'long_text' | 'email' | 'radio' | 'checkboxes' | 'star_rating' | 'scale' | 'nps';
 	label:           string;
 	required:        boolean;
 	placeholder?:    string;

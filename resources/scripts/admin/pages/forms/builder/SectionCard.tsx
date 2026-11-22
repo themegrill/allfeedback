@@ -81,7 +81,7 @@ const SectionCard = ({
 				...(type === 'radio' || type === 'checkboxes'
 					? { options: ['Option 1', 'Option 2', 'Option 3'] }
 					: {}),
-				...(type === 'short_text' || type === 'long_text'
+				...(type === 'short_text' || type === 'long_text' || type === 'email'
 					? { placeholder: '' }
 					: {}),
 			};

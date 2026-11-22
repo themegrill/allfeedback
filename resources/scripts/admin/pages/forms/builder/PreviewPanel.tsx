@@ -66,6 +66,7 @@ const PenLineIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 import { settingsQuery } from '@/admin/queries/settings';
 import { filterVisibleSections } from '@/shared/extensions';
+import { isValidEmail } from '@/shared/validation';
 import { toast } from 'sonner';
 import type {
 	FormField,
@@ -583,12 +584,17 @@ const PreviewPanel = ({
 	const validateStep = (fields: typeof currentFields) => {
 		const errors: Record<string, string> = {};
 		fields.forEach((field) => {
-			if (!field.required) return;
 			const val = fieldValues[field.id];
 			const empty =
 				!val || (Array.isArray(val) ? val.length === 0 : !val.trim());
-			if (empty)
-				errors[field.id] = __('This field is required.', 'allfeedback');
+			if (empty) {
+				if (field.required)
+					errors[field.id] = __('This field is required.', 'allfeedback');
+				return;
+			}
+			if (field.type === 'email' && !isValidEmail(String(val))) {
+				errors[field.id] = __('Please enter a valid email address.', 'allfeedback');
+			}
 		});
 		return errors;
 	};

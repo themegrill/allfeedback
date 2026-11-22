@@ -22,7 +22,7 @@
 
 export interface PreviewField {
 	id:              string;
-	type:            'short_text' | 'long_text' | 'radio' | 'checkboxes' | 'star_rating' | 'scale' | 'nps';
+	type:            'short_text' | 'long_text' | 'email' | 'radio' | 'checkboxes' | 'star_rating' | 'scale' | 'nps';
 	label:           string;
 	required:        boolean;
 	placeholder?:    string;
@@ -95,6 +95,9 @@ function inputHtml( field: PreviewField ): string {
 
 		case 'short_text':
 			return `<input class="allfb-input" type="text" placeholder="${ esc( field.placeholder ?? '' ) }" readonly tabindex="-1">`;
+
+		case 'email':
+			return `<input class="allfb-input" type="email" placeholder="${ esc( field.placeholder ?? '' ) }" readonly tabindex="-1">`;
 
 		case 'long_text':
 			return `<textarea class="allfb-textarea" placeholder="${ esc( field.placeholder ?? '' ) }" rows="3" readonly tabindex="-1"></textarea>`;

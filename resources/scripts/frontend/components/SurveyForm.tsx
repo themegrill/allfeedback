@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { filterVisibleSections } from '@/shared/extensions';
+import { isValidEmail } from '@/shared/validation';
 import { activeSections, normalizeSettings, parseSections, trackEvent } from '../utils';
 import type { AllfbConfig, Survey } from '../types';
 import { FieldPreview } from './FieldPreview';
@@ -71,10 +72,15 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 	const validateStep = (): Record<string, string> => {
 		const errors: Record<string, string> = {};
 		currentSection.fields.forEach( ( field ) => {
-			if ( ! field.required ) return;
 			const val   = fieldValues[ field.id ];
 			const empty = ! val || ( Array.isArray( val ) ? val.length === 0 : ! val.trim() );
-			if ( empty ) errors[ field.id ] = 'This field is required.';
+			if ( empty ) {
+				if ( field.required ) errors[ field.id ] = 'This field is required.';
+				return;
+			}
+			if ( field.type === 'email' && ! isValidEmail( String( val ) ) ) {
+				errors[ field.id ] = 'Please enter a valid email address.';
+			}
 		} );
 		return errors;
 	};

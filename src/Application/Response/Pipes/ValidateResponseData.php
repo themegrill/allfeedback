@@ -59,6 +59,21 @@ class ValidateResponseData implements PipeInterface {
 			}
 		);
 
+		// Email questions must hold a valid address; empty answers are handled by "required" in the widget.
+		foreach ( (array) ( $context->survey->getFormSchema()['sections'] ?? [] ) as $section ) {
+			foreach ( (array) ( $section['fields'] ?? [] ) as $field ) {
+				if ( 'email' !== ( $field['type'] ?? '' ) ) {
+					continue;
+				}
+				$value = $data[ (string) ( $field['id'] ?? '' ) ] ?? '';
+				if ( is_string( $value ) && '' !== trim( $value ) && ! is_email( trim( $value ) ) ) {
+					throw ValidationException::withErrors(
+						[ 'response_data' => esc_html__( 'Please enter a valid email address.', 'allfeedback' ) ]
+					);
+				}
+			}
+		}
+
 		return $next( $context );
 	}
 }

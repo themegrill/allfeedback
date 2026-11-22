@@ -1,6 +1,7 @@
 export type FieldType =
 	| 'short_text'
 	| 'long_text'
+	| 'email'
 	| 'radio'
 	| 'checkboxes'
 	| 'star_rating'
