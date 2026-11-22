@@ -13,6 +13,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Toaster } from '@/components/ui/sonner';
 import { queryClient } from '@/lib/query-client';
 import { cn, htmlToText } from '@/lib/utils';
@@ -39,6 +40,7 @@ window.AllFeedback = {
 		SelectItem,
 		SelectTrigger,
 		SelectValue,
+		Switch,
 		Tooltip,
 	},
 	utils: { cn, htmlToText },

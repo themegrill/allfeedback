@@ -7,11 +7,13 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import UnsavedChangesBadge from '@/components/ui/unsaved-changes-badge';
 import { cn } from '@/lib/utils';
+import { EXTENSION_FILTERS } from '@/shared/extensions';
 import { useForm, useStore } from '@tanstack/react-form';
 import { useQuery } from '@tanstack/react-query';
+import { applyFilters } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 import { SlidersHorizontal } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ComponentType } from 'react';
 
 const labelCls = 'text-base font-normal text-foreground/90';
 
@@ -68,6 +70,18 @@ const Collapse = ({
 		</div>
 	</div>
 );
+
+/** A section an add-on adds to the bottom of this page. It saves its own values. */
+interface AdvancedSettingsSection {
+	name: string;
+	title: string;
+	Component: ComponentType;
+}
+
+const getExtensionSections = (): AdvancedSettingsSection[] => {
+	const list = applyFilters(EXTENSION_FILTERS.advancedSettingsSections, []);
+	return Array.isArray(list) ? (list as AdvancedSettingsSection[]) : [];
+};
 
 const AdvancedSettingsSkeleton = () => (
 	<div>
@@ -137,6 +151,7 @@ type AdvancedPatch = {
 };
 
 const AdvancedSettings = () => {
+	const extensionSections = getExtensionSections();
 	const { data, isPending } = useQuery(settingsQuery());
 	const {
 		isDirty: sharedIsDirty,
@@ -379,6 +394,16 @@ const AdvancedSettings = () => {
 						/>
 					</Row>
 				</div>
+
+				{extensionSections.map(({ name, title, Component }) => (
+					<div key={name}>
+						<div className="border-border/50 my-6 border-t" />
+						<div className="space-y-3">
+							<SectionLabel>{title}</SectionLabel>
+							<Component />
+						</div>
+					</div>
+				))}
 			</div>
 		</div>
 	);

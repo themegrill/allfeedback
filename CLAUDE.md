@@ -8,6 +8,16 @@ Entry: `allfeedback.php` → `src/Plugin.php`
 
 ---
 
+## Terminology: survey, not form
+
+AllFeedback is a survey plugin. **"Form" and "survey" mean the same thing here.** The code and UI grew up saying "form" (`form_schema`, `FormBuilder`, `/analytics/forms`, "All Forms"), but the product word is **survey**.
+
+- New code, docs, UI text, REST/ability names and commit messages: say **survey**.
+- Existing identifiers that say "form" stay as they are. Renaming `form_schema`, routes or hooks would break saved data and public APIs.
+- When you see "form" in this codebase, read it as "survey".
+
+---
+
 ## Commands
 
 ```bash

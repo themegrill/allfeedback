@@ -12,6 +12,8 @@ export const EXTENSION_FILTERS = {
 	visibleSections: 'allfeedback.form.visibleSections',
 	/** ( extensions ) => extensions — add panels and badges to each field in the builder. */
 	fieldExtensions: 'allfeedback.builder.fieldExtensions',
+	/** ( sections ) => sections — add sections to the bottom of Settings → Advanced. */
+	advancedSettingsSections: 'allfeedback.settings.advancedSections',
 } as const;
 
 type Answers = Record<string, string | string[] | undefined>;
