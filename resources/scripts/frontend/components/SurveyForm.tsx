@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { filterVisibleSections } from '@/shared/extensions';
+import { filterVisibleSections, mayRevealLaterPages } from '@/shared/extensions';
 import { isValidEmail } from '@/shared/validation';
 import { activeSections, normalizeSettings, parseSections, trackEvent } from '../utils';
 import type { AllfbConfig, Survey } from '../types';
@@ -47,6 +47,8 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 	const [ submitError,  setSubmitError  ] = useState( '' );
 	const [ consent,      setConsent      ] = useState( false );
 	const [ consentError, setConsentError ] = useState( '' );
+	// Set when the visitor presses Next on what turns out to be the final page (e.g. an optional question left blank).
+	const [ lastConfirmed, setLastConfirmed ] = useState( false );
 
 	const hasStartedRef = useRef( false );
 
@@ -57,11 +59,13 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 		return <p className="allfb-panel__placeholder">This survey has no questions yet.</p>;
 	}
 
-	const isLastStep      = stepIndex === totalSteps - 1;
 	const currentSection  = sections[ Math.min( stepIndex, totalSteps - 1 ) ];
+	const isLastStep      = stepIndex === totalSteps - 1 &&
+		( lastConfirmed || ! mayRevealLaterPages( allSections, sections, currentSection.id, fieldValues ) );
 
 	const handleChange = ( fieldId: string, value: string | string[] ) => {
 		setFieldValues( ( prev ) => ( { ...prev, [ fieldId ]: value } ) );
+		setLastConfirmed( false );
 		setFieldErrors( ( prev ) => ( { ...prev, [ fieldId ]: '' } ) );
 		if ( ! hasStartedRef.current && sessionId ) {
 			hasStartedRef.current = true;
@@ -89,12 +93,14 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 		const errors = validateStep();
 		if ( Object.keys( errors ).length ) { setFieldErrors( errors ); return; }
 		setFieldErrors( {} );
+		if ( stepIndex + 1 >= totalSteps ) { setLastConfirmed( true ); return; }
 		setStepIndex( ( s ) => s + 1 );
 	};
 
 	const handleBack = () => {
 		setFieldErrors( {} );
 		setConsentError( '' );
+		setLastConfirmed( false );
 		setStepIndex( ( s ) => s - 1 );
 	};
 
