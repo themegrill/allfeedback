@@ -408,7 +408,7 @@ const ImportSection = () => {
 	);
 };
 
-const ImportExportSettings = () => (
+const ImportExport = () => (
 	<div>
 		<div className="border-border/50 flex items-center gap-3 border-b px-6 py-4">
 			<div className="bg-primary/10 flex size-9 items-center justify-center rounded-xl">
@@ -434,4 +434,4 @@ const ImportExportSettings = () => (
 	</div>
 );
 
-export default ImportExportSettings;
+export default ImportExport;

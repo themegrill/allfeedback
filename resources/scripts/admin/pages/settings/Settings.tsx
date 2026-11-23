@@ -5,22 +5,10 @@ import type { FileRoutesByFullPath } from '@/admin/routeTree.gen';
 import { Button } from '@/components/ui/button';
 import { deepMerge } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, Outlet, useBlocker, useLocation } from '@tanstack/react-router';
+import { Link, Outlet, useBlocker } from '@tanstack/react-router';
 import { __ } from '@wordpress/i18n';
-import {
-	ArrowLeftRight,
-	Loader2,
-	Mail,
-	Settings2,
-	SlidersHorizontal,
-} from 'lucide-react';
-import {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useState,
-} from 'react';
+import { Loader2, Mail, Settings2, SlidersHorizontal } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 const isMac =
@@ -53,15 +41,7 @@ const NAV_ITEMS: NavItem[] = [
 		icon: SlidersHorizontal,
 		to: '/settings/advanced',
 	},
-	{
-		label: __('Import / Export', 'allfeedback'),
-		icon: ArrowLeftRight,
-		to: '/settings/import-export',
-	},
 ];
-
-/** Settings tabs that act immediately and have nothing for the Save button to save. */
-const NO_SAVE_PATHS: string[] = ['/settings/import-export'];
 
 type SettingsDirtyCtx = {
 	isDirty: boolean;
@@ -90,9 +70,6 @@ const Settings = () => {
 		Record<string, Record<string, unknown>>
 	>({});
 	const anyDirty = Object.values(dirtyMap).some(Boolean);
-	const showSave = !NO_SAVE_PATHS.includes(
-		useLocation({ select: (l) => l.pathname }),
-	);
 
 	const setDirty = useCallback((key: string, dirty: boolean) => {
 		setDirtyMap((prev) => ({ ...prev, [key]: dirty }));
@@ -149,10 +126,9 @@ const Settings = () => {
 				save();
 			}
 		};
-		if (!showSave) return;
 		document.addEventListener('keydown', handler);
 		return () => document.removeEventListener('keydown', handler);
-	}, [save, showSave]);
+	}, [save]);
 
 	useBlocker({
 		shouldBlockFn: ({ next }) => {
@@ -200,28 +176,26 @@ const Settings = () => {
 
 						<div className="border-border/60 min-w-0 flex-1 overflow-hidden rounded-2xl border bg-white">
 							<Outlet />
-							{showSave && (
-								<div className="border-border/50 flex items-center justify-end gap-3 border-t px-6 py-4">
-									{!isSaving && (
-										<span className="flex items-center gap-1">
-											{(isMac ? ['⌘', 'S'] : ['Ctrl', 'S']).map((k) => (
-												<kbd
-													key={k}
-													className="border-border bg-muted/60 text-2xs text-muted-foreground/60 rounded border px-1.5 py-0.5 leading-none font-medium"
-												>
-													{k}
-												</kbd>
-											))}
-										</span>
-									)}
-									<Button onClick={save} disabled={isSaving}>
-										{isSaving && <Loader2 className="animate-spin" />}
-										{isSaving
-											? __('Saving…', 'allfeedback')
-											: __('Save Changes', 'allfeedback')}
-									</Button>
-								</div>
-							)}
+							<div className="border-border/50 flex items-center justify-end gap-3 border-t px-6 py-4">
+								{!isSaving && (
+									<span className="flex items-center gap-1">
+										{(isMac ? ['⌘', 'S'] : ['Ctrl', 'S']).map((k) => (
+											<kbd
+												key={k}
+												className="border-border bg-muted/60 text-2xs text-muted-foreground/60 rounded border px-1.5 py-0.5 leading-none font-medium"
+											>
+												{k}
+											</kbd>
+										))}
+									</span>
+								)}
+								<Button onClick={save} disabled={isSaving}>
+									{isSaving && <Loader2 className="animate-spin" />}
+									{isSaving
+										? __('Saving…', 'allfeedback')
+										: __('Save Changes', 'allfeedback')}
+								</Button>
+							</div>
 						</div>
 					</div>
 				</div>
