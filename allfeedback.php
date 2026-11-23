@@ -5,7 +5,7 @@
  * Description: Collect customer feedback with customizable feedback forms. All responses are stored in your own WordPress database — no external accounts required.
  * Author:      Themegrill
  * Author URI:  https://themegrill.com
- * Version:     1.0.0
+ * Version:     1.1.0
  * Requires at least: 6.5
  * Requires PHP: 8.2
  * Text Domain: allfeedback
