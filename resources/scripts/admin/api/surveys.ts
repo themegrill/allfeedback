@@ -168,6 +168,27 @@ export type ContentSearchParams = {
 	per_page?:  number;
 };
 
+export type SurveyExportItem = {
+	title:       string;
+	description: string;
+	form_schema: SurveyFormSchema | Record<string, unknown> | unknown[];
+	settings:    Record<string, unknown> | unknown[];
+	styling:     Record<string, unknown> | unknown[];
+};
+
+export type SurveyExportBundle = {
+	plugin:      'allfeedback';
+	version:     string;
+	exported_at: string;
+	surveys:     SurveyExportItem[];
+};
+
+export type SurveyImportResult = {
+	imported: number;
+	surveys:  Survey[];
+	failed:   { index: number; title: string; reason: string }[];
+};
+
 export const surveysApi = {
 	list: (params?: SurveyListParams) =>
 		request<SurveyListResponse>('/surveys' + toQuery(params)),
@@ -201,6 +222,12 @@ export const surveysApi = {
 
 	pause: (id: number) =>
 		request<Survey>(`/surveys/${id}/pause`, { method: 'POST' }),
+
+	export: (ids: number[]) =>
+		request<SurveyExportBundle>('/surveys/export' + toQuery({ ids: ids.join(',') })),
+
+	import: (surveys: unknown[]) =>
+		request<SurveyImportResult>('/surveys/import', { method: 'POST', data: { surveys } }),
 
 	contentSearch: (params?: ContentSearchParams) =>
 		request<ContentSearchResponse>('/content-search' + toQuery(params)),
