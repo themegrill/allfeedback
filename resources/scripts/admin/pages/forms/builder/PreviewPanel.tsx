@@ -143,6 +143,8 @@ interface WidgetBodyProps {
 	stepIndex: number;
 	totalSteps: number;
 	hasSteps: boolean;
+	/** The builder's current page has no questions; visitors never see it. */
+	emptyPageSelected: boolean;
 	isLastStep: boolean;
 	currentFields: FormField[];
 	isSubmitted: boolean;
@@ -179,6 +181,7 @@ const WidgetBody = ({
 	stepIndex,
 	totalSteps,
 	hasSteps,
+	emptyPageSelected,
 	isLastStep,
 	currentFields,
 	isSubmitted,
@@ -211,7 +214,14 @@ const WidgetBody = ({
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key !== 'Enter') return;
 		if ((e.target as HTMLElement).tagName === 'TEXTAREA') return;
-		if (isSubmitted || isMinimized || isClosed || !hasSteps || isSubmitting)
+		if (
+			isSubmitted ||
+			isMinimized ||
+			isClosed ||
+			!hasSteps ||
+			emptyPageSelected ||
+			isSubmitting
+		)
 			return;
 		e.preventDefault();
 		if (isLastStep) {
@@ -298,11 +308,16 @@ const WidgetBody = ({
 								: __('Your response has been recorded.', 'allfeedback')}
 						</p>
 					</div>
-				) : !hasSteps ? (
+				) : !hasSteps || emptyPageSelected ? (
 					<div className="flex flex-col items-center justify-center py-6 text-center">
 						<Eye className="text-muted-foreground/25 mb-1.5 size-4" />
 						<p className="text-muted-foreground/80 text-[8.5px]">
-							{__('Add fields to preview', 'allfeedback')}
+							{hasSteps
+								? __(
+										'This page has no questions yet. Visitors skip empty pages.',
+										'allfeedback',
+									)
+								: __('Add fields to preview', 'allfeedback')}
 						</p>
 					</div>
 				) : (
@@ -506,6 +521,10 @@ const PreviewPanel = ({
 	const hasSteps = totalSteps > 0;
 
 	const stepIndex = Math.min(currentStep, Math.max(0, totalSteps - 1));
+	const emptyPageSelected =
+		activeSectionIndex != null &&
+		activeSectionIndex >= 0 &&
+		sections[activeSectionIndex]?.fields.length === 0;
 	const isLastStep =
 		stepIndex === totalSteps - 1 &&
 		(lastConfirmed ||
@@ -695,8 +714,7 @@ const PreviewPanel = ({
 		setSubmitError('');
 		setConsentChecked(false);
 		setConsentError('');
-		setLastConfirmed(false);
-		setCurrentStep(0);
+		goToStep(0);
 	};
 
 	const sharedWidgetProps = {
@@ -704,6 +722,7 @@ const PreviewPanel = ({
 		stepIndex,
 		totalSteps,
 		hasSteps,
+		emptyPageSelected,
 		isLastStep,
 		currentFields,
 		isSubmitted,
@@ -740,8 +759,7 @@ const PreviewPanel = ({
 			setSubmitError('');
 			setConsentChecked(false);
 			setConsentError('');
-			setLastConfirmed(false);
-			setCurrentStep(0);
+			goToStep(0);
 		},
 	};
 
@@ -787,7 +805,9 @@ const PreviewPanel = ({
 			<span className="text-muted-foreground min-w-[52px] text-center text-sm font-medium">
 				{isSubmitted
 					? __('Thanks', 'allfeedback')
-					: `${stepIndex + 1} / ${adminTotalPages}`}
+					: emptyPageSelected
+						? __('Empty', 'allfeedback')
+						: `${stepIndex + 1} / ${adminTotalPages}`}
 			</span>
 			<Tooltip content={__('Next page', 'allfeedback')}>
 				<button

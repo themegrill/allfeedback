@@ -34,6 +34,7 @@ import BuilderCanvas from './builder/BuilderCanvas';
 import { computeRequiredFeatures } from './builder/extensions';
 import { INACTIVE_FORM_MESSAGE } from './inactiveForm';
 import PreviewPanel from './builder/PreviewPanel';
+import { getInitialPreviewWidth, PREVIEW_WIDTH_KEY } from './builder/previewWidth';
 import SettingsPanel from './builder/SettingsPanel';
 import StylingPanel from './builder/StylingPanel';
 import type {
@@ -438,16 +439,7 @@ const FormBuilder = () => {
 	const [settingsScrolled, setSettingsScrolled] = useState(false);
 	const [settingsProgress, setSettingsProgress] = useState(0);
 	const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
-	const [previewWidth, setPreviewWidth] = useState(() => {
-		const saved = localStorage.getItem('allfeedback_preview_width_v2');
-		if (saved) {
-			const n = parseInt(saved, 10);
-			if (!isNaN(n) && n >= 280)
-				return Math.min(n, Math.round(window.innerWidth * 0.72));
-		}
-		const adminMenu = document.getElementById('adminmenuwrap')?.offsetWidth ?? 0;
-		return Math.max(280, Math.round((window.innerWidth - adminMenu) * 0.4));
-	});
+	const [previewWidth, setPreviewWidth] = useState(getInitialPreviewWidth);
 	const [publishMenuOpen, setPublishMenuOpen] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -629,7 +621,7 @@ const FormBuilder = () => {
 					Math.min(Math.round(window.innerWidth * 0.72), startWidth + delta),
 				);
 				setPreviewWidth(next);
-				localStorage.setItem('allfeedback_preview_width_v2', String(next));
+				localStorage.setItem(PREVIEW_WIDTH_KEY, String(next));
 			};
 			const onUp = () => {
 				document.removeEventListener('mousemove', onMove);
