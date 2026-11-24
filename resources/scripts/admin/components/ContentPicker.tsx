@@ -36,7 +36,7 @@ export const ContentPicker = ( {
 
 	const debouncedQuery = useDebouncedValue( query, 300 );
 
-	const { data, isFetching, isFetchingNextPage, fetchNextPage, hasNextPage } =
+	const { data, isError, isFetching, isFetchingNextPage, fetchNextPage, hasNextPage } =
 		useInfiniteQuery( {
 			queryKey:        [ 'content-search', postType, debouncedQuery ],
 			queryFn:         ( { pageParam } ) =>
@@ -165,7 +165,9 @@ export const ContentPicker = ( {
 			) : visible.length === 0 ? (
 				<div className="px-4 py-3 text-center">
 					<p className="text-[13px] text-muted-foreground/60">
-						{ results.length > 0
+						{ isError
+							? __( 'Could not load results. Please try again.', 'allfeedback' )
+							: results.length > 0
 							? __( 'All results already selected.', 'allfeedback' )
 							: query
 								? __( 'No results found.', 'allfeedback' )
