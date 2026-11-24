@@ -82,6 +82,7 @@ class ContentSearchController extends RestController {
 				'post_type'              => $post_types,
 				'post_status'            => 'publish',
 				's'                      => $search,
+				'search_columns'         => [ 'post_title' ],
 				'posts_per_page'         => $per_page,
 				'offset'                 => $offset,
 				'orderby'                => 'title',
@@ -196,7 +197,7 @@ class ContentSearchController extends RestController {
 	private function pinQueryArgs( \WP_Query $query, array $query_args ): \Closure {
 		$pinned = array_intersect_key(
 			$query_args,
-			array_flip( [ 'post_type', 'post_status', 'posts_per_page', 'offset', 'orderby', 'order' ] )
+			array_flip( [ 'post_type', 'post_status', 'search_columns', 'posts_per_page', 'offset', 'orderby', 'order' ] )
 		);
 
 		return static function ( \WP_Query $current ) use ( $query, $pinned ): void {
