@@ -262,14 +262,15 @@ class WpdbSurveyRepository implements SurveyRepository {
 	private function insert( Survey $survey ): Survey {
 		global $wpdb;
 
-		$styling = $survey->getStyling();
+		$styling     = $survey->getStyling();
+		$form_schema = $this->sanitizeFormSchema( $survey->getFormSchema() );
 
 		$result = $wpdb->insert(
 			$this->table,
 			[
 				'title'           => $survey->getTitle(),
 				'description'     => $survey->getDescription(),
-				'form_schema'     => wp_json_encode( $survey->getFormSchema() ),
+				'form_schema'     => wp_json_encode( $form_schema ),
 				'settings'        => wp_json_encode( $survey->getSettings() ),
 				'styling'         => $styling !== [] ? wp_json_encode( $styling ) : null,
 				'targeting'       => wp_json_encode( $survey->getTargeting() ),
@@ -291,7 +292,7 @@ class WpdbSurveyRepository implements SurveyRepository {
 			id: (int) $wpdb->insert_id,
 			title: $survey->getTitle(),
 			description: $survey->getDescription(),
-			form_schema: $survey->getFormSchema(),
+			form_schema: $form_schema,
 			settings: $survey->getSettings(),
 			status: $survey->getStatus(),
 			response_count: $survey->getResponseCount(),
@@ -315,14 +316,15 @@ class WpdbSurveyRepository implements SurveyRepository {
 	private function update( Survey $survey ): Survey {
 		global $wpdb;
 
-		$styling = $survey->getStyling();
+		$styling     = $survey->getStyling();
+		$form_schema = $this->sanitizeFormSchema( $survey->getFormSchema() );
 
 		$result = $wpdb->update(
 			$this->table,
 			[
 				'title'           => $survey->getTitle(),
 				'description'     => $survey->getDescription(),
-				'form_schema'     => wp_json_encode( $survey->getFormSchema() ),
+				'form_schema'     => wp_json_encode( $form_schema ),
 				'settings'        => wp_json_encode( $survey->getSettings() ),
 				'styling'         => $styling !== [] ? wp_json_encode( $styling ) : null,
 				'targeting'       => wp_json_encode( $survey->getTargeting() ),
@@ -341,6 +343,50 @@ class WpdbSurveyRepository implements SurveyRepository {
 		}
 
 		return $survey;
+	}
+
+	/**
+	 * Strip unsafe markup from field labels, which the widget renders as HTML.
+	 *
+	 * @param  array<mixed> $schema Form schema, possibly holding stdClass nodes from a REST body.
+	 * @return array<mixed> Schema with every field label passed through wp_kses_post().
+	 * @since  1.1.1
+	 */
+	private function sanitizeFormSchema( array $schema ): array {
+		$normalised = json_decode( (string) wp_json_encode( $schema ), true );
+
+		if ( ! is_array( $normalised ) ) {
+			return $schema;
+		}
+
+		if ( isset( $normalised['sections'] ) && is_array( $normalised['sections'] ) ) {
+			foreach ( $normalised['sections'] as $index => $section ) {
+				if ( is_array( $section ) && isset( $section['fields'] ) && is_array( $section['fields'] ) ) {
+					$normalised['sections'][ $index ]['fields'] = $this->sanitizeFieldLabels( $section['fields'] );
+				}
+			}
+
+			return $normalised;
+		}
+
+		return array_is_list( $normalised ) ? $this->sanitizeFieldLabels( $normalised ) : $normalised;
+	}
+
+	/**
+	 * Run wp_kses_post() over the label of each field in a list.
+	 *
+	 * @param  array<mixed> $fields Field definitions.
+	 * @return array<mixed>
+	 * @since  1.1.1
+	 */
+	private function sanitizeFieldLabels( array $fields ): array {
+		foreach ( $fields as $index => $field ) {
+			if ( is_array( $field ) && isset( $field['label'] ) && is_string( $field['label'] ) ) {
+				$fields[ $index ]['label'] = wp_kses_post( $field['label'] );
+			}
+		}
+
+		return $fields;
 	}
 
 	/**
