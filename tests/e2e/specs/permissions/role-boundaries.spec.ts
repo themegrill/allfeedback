@@ -150,8 +150,9 @@ test.describe('role boundaries', () => {
 		// form and the assertion would pass for the wrong reason.
 		const ctx = await browser.newContext();
 		const page = await ctx.newPage();
+		const username = user!.username.split(':')[1];
 		await page.goto('/wp-login.php');
-		await page.fill('#user_login', user!.username.split(':')[1]);
+		await page.fill('#user_login', username);
 		await page.fill('#user_pass', user!.password);
 		await page.click('#wp-submit');
 		await expect
@@ -161,6 +162,19 @@ test.describe('role boundaries', () => {
 				),
 			)
 			.toBe(true);
+
+		// The auth cookie is `<username>|<expiry>|...`. Some environments (e.g.
+		// WordPress Playground with autologin) sign every visitor in as the admin
+		// whatever credentials were typed. Then this browser is not a subscriber and
+		// the assertions below would test the wrong user, so skip rather than fail.
+		const cookies = await ctx.cookies();
+		const loggedInAs = cookies
+			.filter((c) => c.name.startsWith('wordpress_logged_in'))
+			.map((c) => decodeURIComponent(c.value).split('|')[0]);
+		test.skip(
+			!loggedInAs.includes(username) || loggedInAs.some((u) => u !== username),
+			`browser is signed in as "${loggedInAs.join(', ')}", not the subscriber — this environment auto-logs in as another user`,
+		);
 
 		await page.goto('/wp-admin/admin.php?page=allfeedback');
 
