@@ -16,6 +16,8 @@ AllFeedback is a WordPress-native feedback and survey plugin that helps you list
 
 Whether you want to track your Net Promoter Score, gather product feedback, run a bug-report form, or simply ask visitors what they think, AllFeedback gives you everything you need right inside your WordPress admin.
 
+https://www.youtube.com/watch?v=bHA2F97oX2o
+
 = Why AllFeedback? =
 
 * **Privacy-first by design.** Every response lives in your own WordPress database. No external accounts, no data shipped to a third-party service, no per-response pricing.
