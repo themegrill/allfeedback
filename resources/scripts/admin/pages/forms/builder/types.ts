@@ -1,6 +1,7 @@
 export type FieldType =
 	| 'short_text'
 	| 'long_text'
+	| 'email'
 	| 'radio'
 	| 'checkboxes'
 	| 'star_rating'
@@ -20,6 +21,8 @@ export interface FormField {
 	scaleMax?: number;
 	scaleLowLabel?: string;
 	scaleHighLabel?: string;
+	/** Settings added by extensions; saved and loaded untouched. */
+	settings?: Record<string, unknown>;
 }
 
 export interface FormSection {
@@ -29,7 +32,7 @@ export interface FormSection {
 }
 
 export type TargetDevice      = 'all' | 'desktop' | 'tablet' | 'mobile';
-export type TargetPages       = 'all' | 'specific_pages' | 'specific_posts';
+export type TargetPages       = 'all' | 'specific_pages' | 'specific_posts' | 'none';
 export type UserState         = 'all' | 'logged_in' | 'logged_out';
 export type TriggerType       = 'immediate' | 'time_delay' | 'scroll_depth';
 export type DelayUnit         = 'seconds' | 'minutes' | 'hours';
@@ -78,7 +81,7 @@ export const DEFAULT_FORM_SETTINGS: FormSettings = {
 	nextLabel: 'Next',
 	backLabel: 'Back',
 	targetDevice: 'all',
-	targetPages: 'all',
+	targetPages: 'none',
 	targetUrls: '',
 	userState: 'all',
 	targetPageIds: [],

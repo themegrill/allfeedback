@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { __ } from '@wordpress/i18n';
+import { __, sprintf } from '@wordpress/i18n';
 import { Plus } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import EmptyCanvasIllustration from './EmptyCanvasIllustration';
@@ -9,7 +9,8 @@ import type { FormSection } from './types';
 interface BuilderCanvasProps {
 	sections: FormSection[];
 	onSectionsChange: (sections: FormSection[]) => void;
-	onScrollChange?: (scrolled: boolean, progress: number) => void;
+	onScrollChange?: (scrolled: boolean) => void;
+	activeSectionIndex?: number;
 	onActiveSectionChange?: (sectionIndex: number) => void;
 }
 
@@ -22,11 +23,21 @@ const BuilderCanvas = ({
 	sections,
 	onSectionsChange,
 	onScrollChange,
+	activeSectionIndex,
 	onActiveSectionChange,
 }: BuilderCanvasProps) => {
 	const [sectionDragIdx, setSectionDragIdx] = useState<number | null>(null);
 	const [sectionDropIdx, setSectionDropIdx] = useState<number | null>(null);
-	const [newSectionId, setNewSectionId] = useState<string | null>(null);
+	// The active page lives in FormBuilder so the preview and builder share it.
+	const currentIdx = Math.min(
+		Math.max(activeSectionIndex ?? 0, 0),
+		Math.max(sections.length - 1, 0),
+	);
+
+	const selectSection = useCallback(
+		(idx: number) => onActiveSectionChange?.(idx),
+		[onActiveSectionChange],
+	);
 
 	const [fieldDrag, setFieldDrag] = useState<FieldPos | null>(null);
 	const [fieldDrop, setFieldDrop] = useState<FieldPos | null>(null);
@@ -37,9 +48,9 @@ const BuilderCanvas = ({
 			title: `Page ${sections.length + 1}`,
 			fields: [],
 		};
-		setNewSectionId(newSection.id);
 		onSectionsChange([...sections, newSection]);
-	}, [sections, onSectionsChange]);
+		selectSection(sections.length);
+	}, [sections, onSectionsChange, selectSection]);
 
 	const handleSectionChange = useCallback(
 		(idx: number, section: FormSection) => {
@@ -53,8 +64,9 @@ const BuilderCanvas = ({
 	const deleteSection = useCallback(
 		(idx: number) => {
 			onSectionsChange(sections.filter((_, i) => i !== idx));
+			selectSection(Math.max(0, idx - 1));
 		},
-		[sections, onSectionsChange],
+		[sections, onSectionsChange, selectSection],
 	);
 
 	const duplicateSection = useCallback(
@@ -70,8 +82,9 @@ const BuilderCanvas = ({
 			const next = [...sections];
 			next.splice(idx + 1, 0, copy);
 			onSectionsChange(next);
+			selectSection(idx + 1);
 		},
-		[sections, onSectionsChange],
+		[sections, onSectionsChange, selectSection],
 	);
 
 	const handleSectionDragStart = (idx: number) => setSectionDragIdx(idx);
@@ -97,6 +110,7 @@ const BuilderCanvas = ({
 		const [removed] = next.splice(sectionDragIdx, 1);
 		next.splice(targetIdx, 0, removed);
 		onSectionsChange(next);
+		selectSection(targetIdx);
 		setSectionDragIdx(null);
 		setSectionDropIdx(null);
 	};
@@ -146,7 +160,7 @@ const BuilderCanvas = ({
 					<EmptyCanvasIllustration />
 					<Button onClick={addSection} className="-mt-1">
 						<Plus className="size-4" />
-						{__('Add a Section', 'allfeedback')}
+						{__('Add a Page', 'allfeedback')}
 					</Button>
 				</div>
 			</div>
@@ -154,40 +168,77 @@ const BuilderCanvas = ({
 	}
 
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const el = e.currentTarget;
-		const scrolled = el.scrollTop > 0;
-		const progress =
-			el.scrollHeight <= el.clientHeight
-				? 0
-				: el.scrollTop / (el.scrollHeight - el.clientHeight);
-		onScrollChange?.(scrolled, progress);
+		onScrollChange?.(e.currentTarget.scrollTop > 0);
 	};
+
+	const section = sections[currentIdx];
 
 	return (
 		<div className="flex-1 overflow-y-auto bg-background p-5" onScroll={handleScroll}>
-			<div
-				className="w-full space-y-4"
-				onDragLeave={(e) => {
-					if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-						setSectionDropIdx(null);
-					}
-				}}
-			>
-				{sections.map((section, idx) => (
+			<div className="w-full space-y-5">
+				<div
+					className="flex flex-wrap items-center justify-center gap-3"
+					onDragLeave={(e) => {
+						if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+							setSectionDropIdx(null);
+						}
+					}}
+				>
+					{sections.map((s, idx) => (
+						<button
+							key={s.id}
+							type="button"
+							draggable
+							onClick={() => selectSection(idx)}
+							onDragStart={() => handleSectionDragStart(idx)}
+							onDragOver={(e) => handleSectionDragOver(e, idx)}
+							onDragEnd={handleSectionDragEnd}
+							onDrop={(e) => handleSectionDrop(e, idx)}
+							aria-current={idx === currentIdx ? 'page' : undefined}
+							className={`rounded-full border-2 bg-white px-6 py-2 text-sm transition-colors ${
+								idx === currentIdx
+									? 'border-primary text-primary font-medium'
+									: 'border-border text-muted-foreground hover:border-primary/50'
+							} ${sectionDropIdx === idx && sectionDragIdx !== idx ? 'ring-primary/40 ring-2' : ''} ${
+								sectionDragIdx === idx ? 'opacity-50' : ''
+							}`}
+						>
+							{sprintf(
+								/* translators: %d: page number */
+								__('Page %d', 'allfeedback'),
+								idx + 1,
+							)}
+						</button>
+					))}
+
+					<button
+						type="button"
+						onClick={addSection}
+						className="border-border text-foreground hover:border-primary/50 flex items-center gap-1 rounded-full border-2 bg-white px-6 py-2 text-sm transition-colors"
+					>
+						<Plus className="size-3.5" />
+						{__('Add page', 'allfeedback')}
+					</button>
+				</div>
+
+				{section && (
 					<SectionCard
 						key={section.id}
 						section={section}
-						index={idx}
+						index={currentIdx}
 						sectionCount={sections.length}
-						autoFocus={section.id === newSectionId}
-						isDragging={sectionDragIdx === idx}
-						isDragOver={sectionDropIdx === idx && sectionDragIdx !== idx}
+						precedingFields={sections
+							.slice(0, currentIdx)
+							.flatMap((s) => s.fields)}
+						allFields={sections.flatMap((s) => s.fields)}
+						isDragging={false}
+						isDragOver={false}
 						fieldDrag={fieldDrag}
 						fieldDrop={fieldDrop}
-						onSectionChange={(s) => handleSectionChange(idx, s)}
-						onSectionDelete={() => deleteSection(idx)}
-						onSectionDuplicate={() => duplicateSection(idx)}
-						onSectionFocus={() => onActiveSectionChange?.(idx)}
+						onSectionChange={(s) => handleSectionChange(currentIdx, s)}
+						onSectionDelete={() => deleteSection(currentIdx)}
+						onSectionDuplicate={() => duplicateSection(currentIdx)}
+						onSectionFocus={() => onActiveSectionChange?.(currentIdx)}
 						onDragStart={handleSectionDragStart}
 						onDragOver={handleSectionDragOver}
 						onDragEnd={handleSectionDragEnd}
@@ -198,19 +249,7 @@ const BuilderCanvas = ({
 						onFieldDragEnd={handleFieldDragEnd}
 						onFieldDrop={handleFieldDrop}
 					/>
-				))}
-
-				<div className="flex justify-center py-2">
-					<Button
-						size="sm"
-						variant="outline"
-						onClick={addSection}
-						className="border-dashed"
-					>
-						<Plus className="size-3.5" />
-						{__('Add Section', 'allfeedback')}
-					</Button>
-				</div>
+				)}
 			</div>
 		</div>
 	);

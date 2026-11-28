@@ -8,6 +8,8 @@ export function cn(...inputs: ClassValue[]): string {
 export function htmlToText(html: string): string {
 	const div = document.createElement('div');
 	div.innerHTML = html;
+	// textContent includes <style>/<script> bodies, which would surface raw CSS/JS as label text.
+	div.querySelectorAll('style, script, template').forEach((el) => el.remove());
 	return div.textContent ?? div.innerText ?? '';
 }
 

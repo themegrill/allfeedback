@@ -99,7 +99,7 @@ class TargetingEngine {
 
 		$ids = [];
 		foreach ( $surveys as $survey ) {
-			if ( $this->surveyMatchesCurrentPage( $survey ) ) {
+			if ( $survey->isLive() && $this->surveyMatchesCurrentPage( $survey ) ) {
 				$ids[] = $survey->getId();
 			}
 		}
@@ -179,6 +179,10 @@ class TargetingEngine {
 
 		if ( $target_pages === 'all' ) {
 			return true;
+		}
+
+		if ( $target_pages === 'none' ) {
+			return false;
 		}
 
 		$ids = array_values(

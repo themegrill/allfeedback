@@ -512,6 +512,10 @@ class DevToolsController extends RestController {
 					$data[ $field['id'] ] = self::SHORT_ANSWERS[ array_rand( self::SHORT_ANSWERS ) ];
 					break;
 
+				case 'email':
+					$data[ $field['id'] ] = 'respondent' . wp_rand( 1, 999 ) . '@example.com';
+					break;
+
 				case 'long_text':
 				default:
 					$data[ $field['id'] ] = self::COMMENTS[ array_rand( self::COMMENTS ) ];

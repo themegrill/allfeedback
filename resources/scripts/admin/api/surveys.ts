@@ -12,6 +12,8 @@ export type Survey = {
 	styling:         Record<string, unknown> | null;
 	status:          SurveyStatus;
 	conflict_reason: string | null;
+	/** Add-on features this form needs that aren't active; the form is offline while non-empty. */
+	missing_features?: string[];
 	response_count:  number;
 	created_by:      number;
 	created_at:      string;
@@ -33,8 +35,10 @@ export type SurveyFormSchemaSection = {
 };
 
 export type SurveyFormSchema = {
-	version:  string;
-	sections: SurveyFormSchemaSection[];
+	version:   string;
+	sections:  SurveyFormSchemaSection[];
+	/** Add-on features the form uses, e.g. 'conditional-logic'. */
+	requires?: string[];
 };
 
 export type SurveyListResponse = PaginatedMeta & {
@@ -164,6 +168,27 @@ export type ContentSearchParams = {
 	per_page?:  number;
 };
 
+export type SurveyExportItem = {
+	title:       string;
+	description: string;
+	form_schema: SurveyFormSchema | Record<string, unknown> | unknown[];
+	settings:    Record<string, unknown> | unknown[];
+	styling:     Record<string, unknown> | unknown[];
+};
+
+export type SurveyExportBundle = {
+	plugin:      'allfeedback';
+	version:     string;
+	exported_at: string;
+	surveys:     SurveyExportItem[];
+};
+
+export type SurveyImportResult = {
+	imported: number;
+	surveys:  Survey[];
+	failed:   { index: number; title: string; reason: string }[];
+};
+
 export const surveysApi = {
 	list: (params?: SurveyListParams) =>
 		request<SurveyListResponse>('/surveys' + toQuery(params)),
@@ -197,6 +222,12 @@ export const surveysApi = {
 
 	pause: (id: number) =>
 		request<Survey>(`/surveys/${id}/pause`, { method: 'POST' }),
+
+	export: (ids: number[]) =>
+		request<SurveyExportBundle>('/surveys/export' + toQuery({ ids: ids.join(',') })),
+
+	import: (surveys: unknown[]) =>
+		request<SurveyImportResult>('/surveys/import', { method: 'POST', data: { surveys } }),
 
 	contentSearch: (params?: ContentSearchParams) =>
 		request<ContentSearchResponse>('/content-search' + toQuery(params)),

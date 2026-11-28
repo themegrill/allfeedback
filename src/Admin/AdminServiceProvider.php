@@ -297,9 +297,22 @@ class AdminServiceProvider implements ServiceProvider {
 			]
 		);
 
+		/**
+		 * Filters extra script handles the admin app depends on.
+		 *
+		 * Add-ons register their script and add its handle here so it loads first
+		 * and can hook into the builder with `wp.hooks.addFilter()`.
+		 *
+		 * @since 1.1.0
+		 *
+		 * @param string[] $deps Script handles.
+		 */
+		$admin_deps = (array) apply_filters( 'allfeedback_admin_script_dependencies', [] );
+
 		$this->asset_manager->enqueueScript(
 			handle:   'admin',
 			src:      'admin.js',
+			deps:     $admin_deps,
 			localize: [
 				'object_name' => '__ALLFB_ADMIN__',
 				'data'        => $admin_data,

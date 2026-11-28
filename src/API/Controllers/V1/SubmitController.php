@@ -126,7 +126,7 @@ class SubmitController extends RestController {
 			return $this->errorResponse( __( 'Invalid or expired nonce.', 'allfeedback' ), 403 );
 		}
 
-		[ $ip_hash, $raw_ip ] = $this->resolveIp();
+		[ $ip_hash, $raw_ip ] = $this->resolveClientIp();
 
 		if ( ! $this->checkRateLimit( $ip_hash ) ) {
 			$this->logger->warning( 'Submission rejected: rate limit exceeded.', [ 'survey_id' => (int) $request->get_param( 'id' ) ] );
@@ -141,9 +141,10 @@ class SubmitController extends RestController {
 		}
 
 		$is_draft         = $survey->getStatus()->value === 'draft';
-		$is_admin_preview = $is_draft && current_user_can( 'manage_options' );
+		$is_inactive      = [] !== $survey->getMissingFeatures();
+		$is_admin_preview = ( $is_draft || $is_inactive ) && current_user_can( 'manage_options' );
 
-		if ( ! $survey->getStatus()->isPublished() && ! $is_admin_preview ) {
+		if ( ! $survey->isLive() && ! $is_admin_preview ) {
 			$this->logger->warning(
 				'Submission rejected: survey not published.',
 				[
@@ -252,38 +253,6 @@ class SubmitController extends RestController {
 		);
 
 		return $this->successResponse( [ 'id' => $response_id ], 201 );
-	}
-
-	/**
-	 * Resolve the visitor's IP address and return both the HMAC-SHA256 hash
-	 * and the raw sanitised IP string.
-	 *
-	 * Uses REMOTE_ADDR (the real connection IP, not spoofable) by default.
-	 * HTTP_X_FORWARDED_FOR is only trusted when the connection originates from
-	 * an IP listed in the `allfeedback_trusted_proxies` filter (e.g. a load
-	 * balancer or CDN whose IP is known and fixed).
-	 *
-	 * @return array{0: string, 1: string} [ $hash, $raw_ip ]
-	 * @since  1.0.0
-	 */
-	private function resolveIp(): array {
-		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
-		$remote_addr = sanitize_text_field( (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
-		$ip          = $remote_addr;
-
-		$trusted_proxies = (array) apply_filters( 'allfeedback_trusted_proxies', [] );
-
-		if ( $trusted_proxies !== [] && in_array( $remote_addr, $trusted_proxies, true ) ) {
-			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.ValidatedSanitizedInput.MissingUnslash
-			$forwarded = sanitize_text_field( trim( explode( ',', (string) ( $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '' ) )[0] ) );
-			if ( $forwarded !== '' && filter_var( $forwarded, FILTER_VALIDATE_IP ) ) {
-				$ip = $forwarded;
-			}
-		}
-
-		$secret = defined( 'AUTH_KEY' ) ? AUTH_KEY : 'allfeedback';
-
-		return [ hash_hmac( 'sha256', $ip, $secret ), $ip ];
 	}
 
 	/**

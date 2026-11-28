@@ -8,6 +8,16 @@ Entry: `allfeedback.php` → `src/Plugin.php`
 
 ---
 
+## Terminology: survey, not form
+
+AllFeedback is a survey plugin. **"Form" and "survey" mean the same thing here.** The code and UI grew up saying "form" (`form_schema`, `FormBuilder`, `/analytics/forms`, "All Forms"), but the product word is **survey**.
+
+- New code, docs, UI text, REST/ability names and commit messages: say **survey**.
+- Existing identifiers that say "form" stay as they are. Renaming `form_schema`, routes or hooks would break saved data and public APIs.
+- When you see "form" in this codebase, read it as "survey".
+
+---
+
 ## Commands
 
 ```bash
@@ -53,9 +63,7 @@ pnpm exec playwright show-report
 > Drop that build step and every JS-dependent spec fails while the REST-only ones
 > pass, which looks like a UI regression and is not one.
 >
-> Three specs in `block-embed.spec.ts` are `test.fail()` markers pinning the open
-> `SurveyBlock` bug below; they will start failing when it is fixed, which is the
-> signal to delete them. See `tests/e2e/support/` and
+> See `tests/e2e/support/` and
 > `.themegrill-qa/knowledge.md`.
 >
 > No PHP unit-test framework is configured.
@@ -135,19 +143,6 @@ Verify tables: `wp db query "SHOW TABLES LIKE 'wp_af%';"`
 
 ## Gotchas
 
-- **⚠ OPEN BUG — `SurveyBlock` fatals on every render.**
-  `src/Frontend/Blocks/SurveyBlock.php:105` has the
-  `$repo = $this->container->get( SurveyRepository::class );` statement sitting
-  *after* a `//` line comment on the same physical line, so it never executes
-  and line 106 calls `findById()` on null. **Any page containing the
-  `allfeedback/survey` block returns HTTP 500** — for published, draft and
-  dangling survey ids alike, since the fatal precedes the status check. It also
-  fires through the REST API (`the_content` is rendered into post responses), so
-  such a page cannot even be *deleted* via REST until its content is blanked.
-  The shortcode path is fine. Introduced by `37a1196`, a bulk PHPCS fix that
-  collapsed the comment and the statement onto one line. Fix: put the assignment
-  on its own line. Pinned by `test.fail()` specs in
-  `tests/e2e/specs/building-forms/block-embed.spec.ts`.
 - **Widget targeting is split across two layers.** PHP (`TargetingEngine`)
   decides which surveys are eligible for the current URL from `targetPages` /
   `target_page_ids` and the `page_id` / `post_id` / `post_type` rules. The React

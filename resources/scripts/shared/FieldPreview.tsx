@@ -170,6 +170,19 @@ export const FieldPreview = ( { field, value, error, onChange, focusFirst = fals
 				/>
 			) }
 
+			{ field.type === 'email' && (
+				<input
+					ref={ inputRef }
+					type="email"
+					inputMode="email"
+					autoComplete="email"
+					className={ `allfb-input${ error ? ' is-error' : '' }` }
+					placeholder={ field.placeholder ?? '' }
+					value={ strVal }
+					onChange={ ( e ) => onChange( e.target.value ) }
+				/>
+			) }
+
 			{ field.type === 'long_text' && (
 				<textarea
 					ref={ textareaRef }
@@ -230,7 +243,7 @@ export const FieldPreview = ( { field, value, error, onChange, focusFirst = fals
 				<NpsField value={ strVal } onChange={ onChange } />
 			) }
 
-			{ ! [ 'short_text', 'long_text', 'radio', 'checkboxes', 'star_rating', 'scale', 'nps' ].includes( field.type ) && (
+			{ ! [ 'short_text', 'long_text', 'email', 'radio', 'checkboxes', 'star_rating', 'scale', 'nps' ].includes( field.type ) && (
 				<input
 					type="text"
 					className="allfb-input"

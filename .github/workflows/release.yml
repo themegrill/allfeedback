@@ -1,0 +1,62 @@
+# Deploys to WordPress.org (SVN) when a GitHub release is published.
+# The release tag must match the plugin's Stable tag (e.g. 1.1.0 or v1.1.0).
+name: Deploy to WordPress.org
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    name: Release to WordPress.org
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches plugin version
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "number=$TAG" >> "$GITHUB_OUTPUT"
+          PLUGIN_VERSION=$(grep -E '^\s*\*\s*Version:' allfeedback.php | head -1 | sed -E 's/.*Version:\s*//' | tr -d '[:space:]')
+          STABLE_TAG=$(grep -E '^Stable tag:' readme.txt | sed -E 's/Stable tag:\s*//' | tr -d '[:space:]')
+          echo "tag=$TAG plugin=$PLUGIN_VERSION stable=$STABLE_TAG"
+          if [ "$TAG" != "$PLUGIN_VERSION" ] || [ "$TAG" != "$STABLE_TAG" ]; then
+            echo "::error::Release tag ($TAG) must equal plugin Version ($PLUGIN_VERSION) and readme Stable tag ($STABLE_TAG)."
+            exit 1
+          fi
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer, wp-cli
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package plugin
+        run: |
+          pnpm release
+          mkdir -p dist
+          unzip -q release/allfeedback.zip -d dist
+
+      - name: WordPress.org plugin deploy
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_NAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_SECRET }}
+          SLUG: allfeedback
+          VERSION: ${{ steps.version.outputs.number }}
+          BUILD_DIR: dist/allfeedback
+          ASSETS_DIR: .wordpress-org

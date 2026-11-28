@@ -102,10 +102,11 @@ class SurveyBlock extends AbstractBlock {
 			return '';
 		}
 
-		/** @var SurveyRepository $repo */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint		$repo   = $this->container->get( SurveyRepository::class );
+		/** @var SurveyRepository $repo */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint
+		$repo   = $this->container->get( SurveyRepository::class );
 		$survey = $repo->findById( $survey_id );
 
-		if ( $survey === null || ! $survey->getStatus()->isPublished() ) {
+		if ( $survey === null || ! $survey->isLive() ) {
 			return '';
 		}
 

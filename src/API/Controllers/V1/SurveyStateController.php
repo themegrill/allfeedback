@@ -101,7 +101,7 @@ class SurveyStateController extends RestController {
 
 		$survey = $this->survey_repository->findById( $survey_id );
 
-		if ( $survey === null || ! $survey->getStatus()->isPublished() ) {
+		if ( $survey === null || ! $survey->isLive() ) {
 			return $this->notFoundResponse( __( 'Survey', 'allfeedback' ) );
 		}
 

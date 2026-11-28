@@ -1,15 +1,7 @@
 ﻿import NotFound from '@/admin/pages/NotFound';
 import { surveyQuery } from '@/admin/queries/surveys';
+import { getInitialPreviewWidth } from '@/admin/pages/forms/builder/previewWidth';
 import { createFileRoute, lazyRouteComponent, notFound } from '@tanstack/react-router';
-
-const getInitialPreviewWidth = () => {
-	const saved = localStorage.getItem('allfeedback_preview_width');
-	if (saved) {
-		const n = parseInt(saved, 10);
-		if (!isNaN(n) && n >= 280) return Math.min(n, Math.round(window.innerWidth * 0.72));
-	}
-	return Math.round(window.innerWidth * 0.30);
-};
 
 const BuilderPending = () => (
 	<div className="allfb-builder fixed inset-0 z-[99999] flex flex-col bg-background">

@@ -7,11 +7,13 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import UnsavedChangesBadge from '@/components/ui/unsaved-changes-badge';
 import { cn } from '@/lib/utils';
+import { EXTENSION_FILTERS } from '@/shared/extensions';
 import { useForm, useStore } from '@tanstack/react-form';
 import { useQuery } from '@tanstack/react-query';
+import { applyFilters } from '@wordpress/hooks';
 import { __ } from '@wordpress/i18n';
 import { SlidersHorizontal } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ComponentType } from 'react';
 
 const labelCls = 'text-base font-normal text-foreground/90';
 
@@ -68,6 +70,28 @@ const Collapse = ({
 		</div>
 	</div>
 );
+
+/** Props free gives an add-on section so it saves with the page's Save button. */
+export interface AdvancedSettingsSectionProps {
+	/** Saved settings, as returned by GET /settings. */
+	settings: Settings | undefined;
+	/** This section's unsaved changes, or undefined when there are none. */
+	patch: Record<string, unknown> | undefined;
+	/** Stage changes as a partial settings object (merged into Save), or null to discard them. */
+	setPatch: (patch: Record<string, unknown> | null) => void;
+}
+
+/** A section an add-on adds to the bottom of this page. */
+interface AdvancedSettingsSection {
+	name: string;
+	title: string;
+	Component: ComponentType<AdvancedSettingsSectionProps>;
+}
+
+const getExtensionSections = (): AdvancedSettingsSection[] => {
+	const list = applyFilters(EXTENSION_FILTERS.advancedSettingsSections, []);
+	return Array.isArray(list) ? (list as AdvancedSettingsSection[]) : [];
+};
 
 const AdvancedSettingsSkeleton = () => (
 	<div>
@@ -137,6 +161,7 @@ type AdvancedPatch = {
 };
 
 const AdvancedSettings = () => {
+	const extensionSections = getExtensionSections();
 	const { data, isPending } = useQuery(settingsQuery());
 	const {
 		isDirty: sharedIsDirty,
@@ -379,6 +404,26 @@ const AdvancedSettings = () => {
 						/>
 					</Row>
 				</div>
+
+				{extensionSections.map(({ name, title, Component }) => {
+					const key = `extension:${name}`;
+					return (
+						<div key={name}>
+							<div className="border-border/50 my-6 border-t" />
+							<div className="space-y-3">
+								<SectionLabel>{title}</SectionLabel>
+								<Component
+									settings={data}
+									patch={patches[key]}
+									setPatch={(patch) => {
+										setPatch(key, patch);
+										setDirty(key, patch !== null);
+									}}
+								/>
+							</div>
+						</div>
+					);
+				})}
 			</div>
 		</div>
 	);

@@ -4,7 +4,7 @@ Tags:              feedback, surveys, nps, customer-feedback, survey-form
 Requires at least: 6.5
 Tested up to:      7.0
 Requires PHP:      8.2
-Stable tag:        1.0.0
+Stable tag:        1.1.0
 License:           GPLv3 or later
 License URI:       https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -15,6 +15,8 @@ Collect customer feedback and NPS scores with a customizable survey widget — e
 AllFeedback is a WordPress-native feedback and survey plugin that helps you listen to your visitors and customers, measure satisfaction, and act on real insights — without sending any feedback data to an external service. Build on-brand surveys in minutes with a drag-and-drop builder, show them with a polished widget, and review the results in a clean analytics dashboard.
 
 Whether you want to track your Net Promoter Score, gather product feedback, run a bug-report form, or simply ask visitors what they think, AllFeedback gives you everything you need right inside your WordPress admin.
+
+https://www.youtube.com/watch?v=bHA2F97oX2o
 
 = Why AllFeedback? =
 

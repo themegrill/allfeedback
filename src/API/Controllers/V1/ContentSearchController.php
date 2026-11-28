@@ -82,6 +82,7 @@ class ContentSearchController extends RestController {
 				'post_type'              => $post_types,
 				'post_status'            => 'publish',
 				's'                      => $search,
+				'search_columns'         => [ 'post_title' ],
 				'posts_per_page'         => $per_page,
 				'offset'                 => $offset,
 				'orderby'                => 'title',
@@ -93,7 +94,14 @@ class ContentSearchController extends RestController {
 			$request
 		);
 
-		$query = new \WP_Query( $query_args );
+		$query = new \WP_Query();
+		$pin   = $this->pinQueryArgs( $query, $query_args );
+
+		// Runs after other pre_get_posts callbacks, which may rewrite non-main queries during REST requests.
+		add_action( 'pre_get_posts', $pin, PHP_INT_MAX );
+		$query->query( $query_args );
+		remove_action( 'pre_get_posts', $pin, PHP_INT_MAX );
+
 		$total = (int) $query->found_posts;
 
 		$items = array_map(
@@ -176,6 +184,30 @@ class ContentSearchController extends RestController {
 		$intersected = array_values( array_intersect( $requested, $allowed ) );
 
 		return $intersected !== [] ? $intersected : $allowed;
+	}
+
+	/**
+	 * Build a pre_get_posts callback that restores the search's own query args.
+	 *
+	 * @param  \WP_Query            $query      The content-search query instance.
+	 * @param  array<string, mixed> $query_args Final (filtered) query args.
+	 * @return \Closure
+	 * @since  1.1.0
+	 */
+	private function pinQueryArgs( \WP_Query $query, array $query_args ): \Closure {
+		$pinned = array_intersect_key(
+			$query_args,
+			array_flip( [ 'post_type', 'post_status', 'search_columns', 'posts_per_page', 'offset', 'orderby', 'order' ] )
+		);
+
+		return static function ( \WP_Query $current ) use ( $query, $pinned ): void {
+			if ( $current !== $query ) {
+				return;
+			}
+			foreach ( $pinned as $key => $value ) {
+				$current->set( $key, $value );
+			}
+		};
 	}
 
 	/**

@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { filterVisibleSections, mayRevealLaterPages } from '@/shared/extensions';
+import { isValidEmail } from '@/shared/validation';
 import { activeSections, normalizeSettings, parseSections, trackEvent } from '../utils';
 import type { AllfbConfig, Survey } from '../types';
 import { FieldPreview } from './FieldPreview';
@@ -30,9 +32,8 @@ interface SurveyFormProps {
 }
 
 export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, alreadySubmitted = false }: SurveyFormProps ) => {
-	const sections    = activeSections( parseSections( survey.form_schema ) );
+	const allSections = activeSections( parseSections( survey.form_schema ) );
 	const ss          = normalizeSettings( survey.settings );
-	const totalSteps  = sections.length;
 
 	const requireConsent  = cfg.settings.require_consent ?? false;
 	const consentText      = ( cfg.settings.consent_text || '' ).trim() ||
@@ -46,18 +47,25 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 	const [ submitError,  setSubmitError  ] = useState( '' );
 	const [ consent,      setConsent      ] = useState( false );
 	const [ consentError, setConsentError ] = useState( '' );
+	// Set when the visitor presses Next on what turns out to be the final page (e.g. an optional question left blank).
+	const [ lastConfirmed, setLastConfirmed ] = useState( false );
 
 	const hasStartedRef = useRef( false );
+
+	const sections   = activeSections( filterVisibleSections( allSections, fieldValues ) );
+	const totalSteps = sections.length;
 
 	if ( sections.length === 0 ) {
 		return <p className="allfb-panel__placeholder">This survey has no questions yet.</p>;
 	}
 
-	const isLastStep      = stepIndex === totalSteps - 1;
-	const currentSection  = sections[ stepIndex ];
+	const currentSection  = sections[ Math.min( stepIndex, totalSteps - 1 ) ];
+	const isLastStep      = stepIndex === totalSteps - 1 &&
+		( lastConfirmed || ! mayRevealLaterPages( allSections, sections, currentSection.id, fieldValues ) );
 
 	const handleChange = ( fieldId: string, value: string | string[] ) => {
 		setFieldValues( ( prev ) => ( { ...prev, [ fieldId ]: value } ) );
+		setLastConfirmed( false );
 		setFieldErrors( ( prev ) => ( { ...prev, [ fieldId ]: '' } ) );
 		if ( ! hasStartedRef.current && sessionId ) {
 			hasStartedRef.current = true;
@@ -68,10 +76,15 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 	const validateStep = (): Record<string, string> => {
 		const errors: Record<string, string> = {};
 		currentSection.fields.forEach( ( field ) => {
-			if ( ! field.required ) return;
 			const val   = fieldValues[ field.id ];
 			const empty = ! val || ( Array.isArray( val ) ? val.length === 0 : ! val.trim() );
-			if ( empty ) errors[ field.id ] = 'This field is required.';
+			if ( empty ) {
+				if ( field.required ) errors[ field.id ] = 'This field is required.';
+				return;
+			}
+			if ( field.type === 'email' && ! isValidEmail( String( val ) ) ) {
+				errors[ field.id ] = 'Please enter a valid email address.';
+			}
 		} );
 		return errors;
 	};
@@ -80,12 +93,14 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 		const errors = validateStep();
 		if ( Object.keys( errors ).length ) { setFieldErrors( errors ); return; }
 		setFieldErrors( {} );
+		if ( stepIndex + 1 >= totalSteps ) { setLastConfirmed( true ); return; }
 		setStepIndex( ( s ) => s + 1 );
 	};
 
 	const handleBack = () => {
 		setFieldErrors( {} );
 		setConsentError( '' );
+		setLastConfirmed( false );
 		setStepIndex( ( s ) => s - 1 );
 	};
 
@@ -112,8 +127,11 @@ export const SurveyForm = ( { cfg, survey, submitNonce, sessionId, onSuccess, al
 		setSubmitError( '' );
 
 		const responseData: Record<string, string | string[]> = {};
-		sections.forEach( ( s ) => s.fields.forEach( ( f ) => {
-			responseData[ f.id ] = fieldValues[ f.id ] ?? ( f.type === 'checkboxes' ? [] : '' );
+		// Hidden questions are submitted empty, even if answered before they were hidden.
+		const visibleIds = new Set( sections.flatMap( ( s ) => s.fields.map( ( f ) => f.id ) ) );
+		allSections.forEach( ( s ) => s.fields.forEach( ( f ) => {
+			const empty = f.type === 'checkboxes' ? [] : '';
+			responseData[ f.id ] = visibleIds.has( f.id ) ? ( fieldValues[ f.id ] ?? empty ) : empty;
 		} ) );
 
 		const allFields = sections.flatMap( ( s ) => s.fields );

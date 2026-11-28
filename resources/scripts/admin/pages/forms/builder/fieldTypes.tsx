@@ -6,6 +6,7 @@ import {
 	CheckSquare,
 	CircleDot,
 	Gauge,
+	Mail,
 	Star,
 	Type,
 } from 'lucide-react';
@@ -36,6 +37,14 @@ export const FIELD_TYPES: FieldTypeConfig[] = [
 		iconBg: '#eff6ff',
 		iconColor: '#3b82f6',
 		defaultLabel: 'Please describe your experience.',
+	},
+	{
+		type: 'email',
+		label: __('Email', 'allfeedback'),
+		Icon: Mail,
+		iconBg: '#eef2ff',
+		iconColor: '#6366f1',
+		defaultLabel: 'What is your email address?',
 	},
 	{
 		type: 'radio',

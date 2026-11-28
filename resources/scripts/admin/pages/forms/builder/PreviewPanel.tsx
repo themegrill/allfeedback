@@ -65,6 +65,11 @@ const PenLineIcon = (props: React.SVGProps<SVGSVGElement>) => (
 );
 
 import { settingsQuery } from '@/admin/queries/settings';
+import {
+	filterVisibleSections,
+	mayRevealLaterPages,
+} from '@/shared/extensions';
+import { isValidEmail } from '@/shared/validation';
 import { toast } from 'sonner';
 import type {
 	FormField,
@@ -83,6 +88,7 @@ interface PreviewPanelProps {
 	surveyId?: number;
 	surveyStatus?: SurveyStatus;
 	activeSectionIndex?: number;
+	onActiveSectionChange?: (sectionIndex: number) => void;
 }
 
 const DEVICES: { value: PreviewDevice; Icon: typeof Monitor; label: string }[] =
@@ -137,6 +143,8 @@ interface WidgetBodyProps {
 	stepIndex: number;
 	totalSteps: number;
 	hasSteps: boolean;
+	/** The builder's current page has no questions; visitors never see it. */
+	emptyPageSelected: boolean;
 	isLastStep: boolean;
 	currentFields: FormField[];
 	isSubmitted: boolean;
@@ -173,6 +181,7 @@ const WidgetBody = ({
 	stepIndex,
 	totalSteps,
 	hasSteps,
+	emptyPageSelected,
 	isLastStep,
 	currentFields,
 	isSubmitted,
@@ -205,7 +214,14 @@ const WidgetBody = ({
 	const handleKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key !== 'Enter') return;
 		if ((e.target as HTMLElement).tagName === 'TEXTAREA') return;
-		if (isSubmitted || isMinimized || isClosed || !hasSteps || isSubmitting)
+		if (
+			isSubmitted ||
+			isMinimized ||
+			isClosed ||
+			!hasSteps ||
+			emptyPageSelected ||
+			isSubmitting
+		)
 			return;
 		e.preventDefault();
 		if (isLastStep) {
@@ -292,11 +308,16 @@ const WidgetBody = ({
 								: __('Your response has been recorded.', 'allfeedback')}
 						</p>
 					</div>
-				) : !hasSteps ? (
+				) : !hasSteps || emptyPageSelected ? (
 					<div className="flex flex-col items-center justify-center py-6 text-center">
 						<Eye className="text-muted-foreground/25 mb-1.5 size-4" />
 						<p className="text-muted-foreground/80 text-[8.5px]">
-							{__('Add fields to preview', 'allfeedback')}
+							{hasSteps
+								? __(
+										'This page has no questions yet. Visitors skip empty pages.',
+										'allfeedback',
+									)
+								: __('Add fields to preview', 'allfeedback')}
 						</p>
 					</div>
 				) : (
@@ -355,7 +376,7 @@ const WidgetBody = ({
 							<div className="allfb-consent-wrap">
 								<label className="allfb-consent">
 									<span
-										className={`allfb-option__checkbox${consentChecked ? ' is-checked' : ''}`}
+										className={`allfb-option__checkbox${consentChecked ? 'is-checked' : ''}`}
 									/>
 									<input
 										type="checkbox"
@@ -454,10 +475,8 @@ const PreviewPanel = ({
 	surveyId,
 	surveyStatus,
 	activeSectionIndex,
+	onActiveSectionChange,
 }: PreviewPanelProps) => {
-	const steps = activeSections(sections);
-	const totalSteps = steps.length;
-	const hasSteps = totalSteps > 0;
 	const maxW = DEVICE_MAX_W[device];
 	const pageMaxW = DEVICE_PAGE_W[device];
 	const isMobile = device === 'mobile';
@@ -469,8 +488,7 @@ const PreviewPanel = ({
 
 	const privacy = globalSettings?.advanced?.privacy;
 	const requireConsent = !!privacy?.require_consent;
-	const consentText =
-		privacy?.consent_text?.trim() || DEFAULT_CONSENT_TEXT;
+	const consentText = privacy?.consent_text?.trim() || DEFAULT_CONSENT_TEXT;
 	const privacyPolicyUrl = privacy?.privacy_policy_url ?? '';
 	const globalColor =
 		cachedWidget?.color ?? __ALLFB_ADMIN__.widgetColor ?? '#6366f1';
@@ -483,7 +501,7 @@ const PreviewPanel = ({
 
 	const sessionIdRef = useRef<string>(genId());
 
-	const [viewMode, setViewMode] = useState<PreviewView>('page');
+	const [viewMode, setViewMode] = useState<PreviewView>('widget');
 	const [isMinimized, setIsMinimized] = useState(false);
 	const [isClosed, setIsClosed] = useState(false);
 	const [fieldValues, setFieldValues] = useState<
@@ -496,9 +514,30 @@ const PreviewPanel = ({
 	const [currentStep, setCurrentStep] = useState(0);
 	const [isSubmitted, setIsSubmitted] = useState(false);
 	const [hasSubmitted, setHasSubmitted] = useState(false);
+	const [lastConfirmed, setLastConfirmed] = useState(false);
+
+	const steps = activeSections(filterVisibleSections(sections, fieldValues));
+	const totalSteps = steps.length;
+	const hasSteps = totalSteps > 0;
 
 	const stepIndex = Math.min(currentStep, Math.max(0, totalSteps - 1));
-	const isLastStep = stepIndex === totalSteps - 1;
+	const emptyPageSelected =
+		activeSectionIndex != null &&
+		activeSectionIndex >= 0 &&
+		sections[activeSectionIndex]?.fields.length === 0;
+	const isLastStep =
+		stepIndex === totalSteps - 1 &&
+		(lastConfirmed ||
+			!mayRevealLaterPages(sections, steps, steps[stepIndex]?.id, fieldValues));
+
+	// User-driven navigation in the preview — mirror it in the builder.
+	const goToStep = (step: number) => {
+		setCurrentStep(step);
+		setLastConfirmed(false);
+		const id = steps[step]?.id;
+		const sectionIdx = sections.findIndex((s) => s.id === id);
+		if (sectionIdx >= 0) onActiveSectionChange?.(sectionIdx);
+	};
 	const currentFields = steps[stepIndex]?.fields ?? [];
 
 	const submitMutation = useMutation({
@@ -530,7 +569,17 @@ const PreviewPanel = ({
 		setSubmitError('');
 		setConsentChecked(false);
 		setConsentError('');
-		setCurrentStep(0);
+		const activeId =
+			activeSectionIndex != null && activeSectionIndex >= 0
+				? sections[activeSectionIndex]?.id
+				: undefined;
+		setLastConfirmed(false);
+		setCurrentStep(
+			Math.max(
+				0,
+				steps.findIndex((s) => s.id === activeId),
+			),
+		);
 		setIsSubmitted(false);
 	}, [
 		allFields(sections)
@@ -543,17 +592,17 @@ const PreviewPanel = ({
 		if (activeSectionIndex == null || activeSectionIndex < 0) return;
 		const targetId = sections[activeSectionIndex]?.id;
 		if (!targetId) return;
-		const targetStep = activeSections(sections).findIndex(
-			(s) => s.id === targetId,
-		);
+		const targetStep = steps.findIndex((s) => s.id === targetId);
 		if (targetStep >= 0 && targetStep !== currentStep) {
 			setFieldErrors({});
+			setLastConfirmed(false);
 			setCurrentStep(targetStep);
 		}
 	}, [activeSectionIndex, sections]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const handleChange = (fieldId: string, value: string | string[]) => {
 		setFieldValues((prev) => ({ ...prev, [fieldId]: value }));
+		setLastConfirmed(false);
 		if (fieldErrors[fieldId]) {
 			setFieldErrors((prev) => ({ ...prev, [fieldId]: '' }));
 		}
@@ -562,12 +611,20 @@ const PreviewPanel = ({
 	const validateStep = (fields: typeof currentFields) => {
 		const errors: Record<string, string> = {};
 		fields.forEach((field) => {
-			if (!field.required) return;
 			const val = fieldValues[field.id];
 			const empty =
 				!val || (Array.isArray(val) ? val.length === 0 : !val.trim());
-			if (empty)
-				errors[field.id] = __('This field is required.', 'allfeedback');
+			if (empty) {
+				if (field.required)
+					errors[field.id] = __('This field is required.', 'allfeedback');
+				return;
+			}
+			if (field.type === 'email' && !isValidEmail(String(val))) {
+				errors[field.id] = __(
+					'Please enter a valid email address.',
+					'allfeedback',
+				);
+			}
 		});
 		return errors;
 	};
@@ -579,7 +636,11 @@ const PreviewPanel = ({
 			return;
 		}
 		setFieldErrors({});
-		setCurrentStep((s) => s + 1);
+		if (stepIndex + 1 >= totalSteps) {
+			setLastConfirmed(true);
+			return;
+		}
+		goToStep(stepIndex + 1);
 	};
 
 	const handleConsentChange = (checked: boolean) => {
@@ -596,9 +657,7 @@ const PreviewPanel = ({
 		setFieldErrors({});
 
 		if (requireConsent && !consentChecked) {
-			setConsentError(
-				__('You must provide consent to submit.', 'allfeedback'),
-			);
+			setConsentError(__('You must provide consent to submit.', 'allfeedback'));
 			return;
 		}
 		setConsentError('');
@@ -613,11 +672,15 @@ const PreviewPanel = ({
 				typeof scoreRaw === 'string' && scoreRaw !== ''
 					? Number(scoreRaw)
 					: undefined;
+			const visibleIds = new Set(allFields(steps).map((f) => f.id));
 			const responseData: Record<string, unknown> = Object.fromEntries(
-				allFormFields.map((f) => [
-					f.id,
-					fieldValues[f.id] ?? (f.type === 'checkboxes' ? [] : ''),
-				]),
+				allFormFields.map((f) => {
+					const empty = f.type === 'checkboxes' ? [] : '';
+					return [
+						f.id,
+						visibleIds.has(f.id) ? (fieldValues[f.id] ?? empty) : empty,
+					];
+				}),
 			);
 			submitMutation.mutate({
 				nonce: __ALLFB_ADMIN__.submitNonce,
@@ -651,7 +714,7 @@ const PreviewPanel = ({
 		setSubmitError('');
 		setConsentChecked(false);
 		setConsentError('');
-		setCurrentStep(0);
+		goToStep(0);
 	};
 
 	const sharedWidgetProps = {
@@ -659,6 +722,7 @@ const PreviewPanel = ({
 		stepIndex,
 		totalSteps,
 		hasSteps,
+		emptyPageSelected,
 		isLastStep,
 		currentFields,
 		isSubmitted,
@@ -685,7 +749,7 @@ const PreviewPanel = ({
 		onNext: handleNext,
 		onBack: () => {
 			setFieldErrors({});
-			setCurrentStep((s) => s - 1);
+			goToStep(stepIndex - 1);
 		},
 		onSubmit: handleSubmit,
 		onResubmit: () => {
@@ -695,7 +759,7 @@ const PreviewPanel = ({
 			setSubmitError('');
 			setConsentChecked(false);
 			setConsentError('');
-			setCurrentStep(0);
+			goToStep(0);
 		},
 	};
 
@@ -707,17 +771,17 @@ const PreviewPanel = ({
 	const adminPrev = () => {
 		if (isSubmitted) {
 			setIsSubmitted(false);
-			setCurrentStep(totalSteps - 1);
+			goToStep(totalSteps - 1);
 		} else if (currentStep > 0) {
 			setFieldErrors({});
-			setCurrentStep((s) => s - 1);
+			goToStep(stepIndex - 1);
 		}
 	};
 
 	const adminNext = () => {
 		if (!isSubmitted && stepIndex < totalSteps - 1) {
 			setFieldErrors({});
-			setCurrentStep((s) => s + 1);
+			goToStep(stepIndex + 1);
 		} else if (!isSubmitted && stepIndex === totalSteps - 1) {
 			setIsSubmitted(true);
 		}
@@ -725,6 +789,38 @@ const PreviewPanel = ({
 
 	const adminCanPrev = hasSteps && adminCurrentPage > 0;
 	const adminCanNext = hasSteps && !isSubmitted;
+
+	const pager = hasSteps ? (
+		<div className="flex items-center gap-0.5">
+			<Tooltip content={__('Previous page', 'allfeedback')}>
+				<button
+					type="button"
+					onClick={adminPrev}
+					disabled={!adminCanPrev}
+					className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
+				>
+					<ChevronLeft className="size-5" />
+				</button>
+			</Tooltip>
+			<span className="text-muted-foreground min-w-[52px] text-center text-sm font-medium">
+				{isSubmitted
+					? __('Thanks', 'allfeedback')
+					: emptyPageSelected
+						? __('Empty', 'allfeedback')
+						: `${stepIndex + 1} / ${adminTotalPages}`}
+			</span>
+			<Tooltip content={__('Next page', 'allfeedback')}>
+				<button
+					type="button"
+					onClick={adminNext}
+					disabled={!adminCanNext}
+					className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
+				>
+					<ChevronRight className="size-5" />
+				</button>
+			</Tooltip>
+		</div>
+	) : null;
 
 	return (
 		<div className="flex h-full flex-col bg-white">
@@ -747,20 +843,6 @@ const PreviewPanel = ({
 					<div className="border-border/60 flex items-center rounded-lg border p-0.5">
 						<button
 							type="button"
-							onClick={() => setViewMode('page')}
-							style={{ fontSize: '12px' }}
-							className={cn(
-								'flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors',
-								viewMode === 'page'
-									? 'bg-primary/10 text-primary'
-									: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
-							)}
-						>
-							<Globe className="size-3.5" />
-							{__('Page', 'allfeedback')}
-						</button>
-						<button
-							type="button"
 							onClick={() => setViewMode('widget')}
 							style={{ fontSize: '12px' }}
 							className={cn(
@@ -772,6 +854,20 @@ const PreviewPanel = ({
 						>
 							<MessageSquare className="size-3.5" />
 							{__('Widget', 'allfeedback')}
+						</button>
+						<button
+							type="button"
+							onClick={() => setViewMode('page')}
+							style={{ fontSize: '12px' }}
+							className={cn(
+								'flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors',
+								viewMode === 'page'
+									? 'bg-primary/10 text-primary'
+									: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground',
+							)}
+						>
+							<Globe className="size-3.5" />
+							{__('Page', 'allfeedback')}
 						</button>
 					</div>
 				</div>
@@ -1007,6 +1103,7 @@ const PreviewPanel = ({
 							onMinimize={() => {}}
 							onClose={() => {}}
 						/>
+						{pager && <div className="mt-3 flex justify-center">{pager}</div>}
 					</div>
 				</div>
 			)}
@@ -1037,35 +1134,7 @@ const PreviewPanel = ({
 					))}
 				</div>
 				<div className="flex flex-1 items-center justify-end">
-					{hasSteps && (
-						<div className="flex items-center gap-0.5">
-							<Tooltip content={__('Previous page', 'allfeedback')}>
-								<button
-									type="button"
-									onClick={adminPrev}
-									disabled={!adminCanPrev}
-									className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
-								>
-									<ChevronLeft className="size-5" />
-								</button>
-							</Tooltip>
-							<span className="text-muted-foreground min-w-[52px] text-center text-sm font-medium">
-								{isSubmitted
-									? __('Thanks', 'allfeedback')
-									: `${stepIndex + 1} / ${adminTotalPages}`}
-							</span>
-							<Tooltip content={__('Next page', 'allfeedback')}>
-								<button
-									type="button"
-									onClick={adminNext}
-									disabled={!adminCanNext}
-									className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-9 items-center justify-center rounded-md transition-colors disabled:pointer-events-none disabled:opacity-30"
-								>
-									<ChevronRight className="size-5" />
-								</button>
-							</Tooltip>
-						</div>
-					)}
+					{viewMode === 'page' && pager}
 				</div>
 			</div>
 		</div>

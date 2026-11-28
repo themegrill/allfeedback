@@ -13,6 +13,7 @@ namespace AllFeedback\API\Controllers\V1;
 defined( 'ABSPATH' ) || exit;
 
 use AllFeedback\API\RestController;
+use AllFeedback\Core\Constants;
 use AllFeedback\Domain\Response\ResponseRepository;
 use AllFeedback\Domain\Survey\Survey;
 use AllFeedback\Domain\Survey\SurveyFilter;
@@ -36,6 +37,8 @@ use AllFeedback\Support\Logger;
  *   DELETE /surveys/{id}/delete          → destroyPermanent()     : permanent delete (must be trashed first)
  *   POST   /surveys/{id}/duplicate       → duplicate()            : copy survey
  *   POST   /surveys/{id}/publish         → publish()              : set status to published
+ *   GET    /surveys/export               → export()               : export surveys as a JSON bundle
+ *   POST   /surveys/import               → import()               : create surveys from a JSON bundle
  *
  * @package AllFeedback\API\Controllers\V1
  * @since   1.0.0
@@ -189,6 +192,40 @@ class SurveysController extends RestController {
 
 		register_rest_route(
 			$this->namespace,
+			'/' . $this->rest_base . '/export',
+			[
+				'methods'             => \WP_REST_Server::READABLE,
+				'callback'            => [ $this, 'export' ],
+				'permission_callback' => [ $this, 'adminPermission' ],
+				'args'                => [
+					'ids' => [
+						'description' => __( 'Comma-separated survey IDs to export.', 'allfeedback' ),
+						'type'        => 'string',
+						'required'    => true,
+					],
+				],
+			]
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/import',
+			[
+				'methods'             => \WP_REST_Server::CREATABLE,
+				'callback'            => [ $this, 'import' ],
+				'permission_callback' => [ $this, 'adminPermission' ],
+				'args'                => [
+					'surveys' => [
+						'description' => __( 'Surveys from an AllFeedback export file.', 'allfeedback' ),
+						'type'        => 'array',
+						'required'    => true,
+					],
+				],
+			]
+		);
+
+		register_rest_route(
+			$this->namespace,
 			'/' . $this->rest_base . '/(?P<id>\d+)/publish',
 			[
 				'methods'             => \WP_REST_Server::CREATABLE,
@@ -324,7 +361,7 @@ class SurveysController extends RestController {
 			return $this->notFoundResponse( __( 'Survey', 'allfeedback' ) );
 		}
 
-		if ( ! current_user_can( 'manage_options' ) && ! $survey->getStatus()->isPublished() ) {
+		if ( ! current_user_can( 'manage_options' ) && ! $survey->isLive() ) {
 			return $this->notFoundResponse( __( 'Survey', 'allfeedback' ) );
 		}
 
@@ -379,7 +416,8 @@ class SurveysController extends RestController {
 			if ( is_wp_error( $settings_check ) ) {
 				return $settings_check;
 			}
-			/** This filter is documented in store(). */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint			$settings_raw = apply_filters( 'allfeedback_settings_before_save', $settings_raw, $request );
+			/** This filter is documented in store(). */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint
+			$settings_raw = apply_filters( 'allfeedback_settings_before_save', $settings_raw, $request );
 			$survey->setSettings( $this->normaliseJsonParam( $settings_raw ) ?? [] );
 			$changed = true;
 		}
@@ -477,6 +515,10 @@ class SurveysController extends RestController {
 		$this->logger->info( 'Survey updated.', $log_context );
 
 		do_action( 'allfeedback_survey_updated', $survey );
+
+		if ( $transitioning_to_published && $survey->getStatus()->isPublished() ) {
+			$this->draftInactiveOverlaps( $survey );
+		}
 
 		if ( $transitioning_to_published && $survey->getStatus()->isPublished() && ! $previous_status->isPublished() ) {
 			do_action( 'allfeedback_survey_activated', $survey );
@@ -595,6 +637,148 @@ class SurveysController extends RestController {
 				'deleted' => true,
 				'id' => $id,
 			]
+		);
+	}
+
+	/**
+	 * GET /allfeedback/v1/surveys/export
+	 *
+	 * Return the chosen surveys as a portable JSON bundle.
+	 *
+	 * @param  \WP_REST_Request $request Full request data.
+	 * @return \WP_REST_Response|\WP_Error
+	 * @since  1.1.0
+	 */
+	public function export( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$ids = array_values( array_unique( array_filter( array_map( 'absint', explode( ',', (string) $request->get_param( 'ids' ) ) ) ) ) );
+
+		if ( $ids === [] ) {
+			return $this->errorResponse( __( 'Select at least one survey to export.', 'allfeedback' ), 422 );
+		}
+
+		$surveys = [];
+		foreach ( $ids as $id ) {
+			$survey = $this->survey_repository->findById( $id );
+			if ( $survey === null ) {
+				continue;
+			}
+			$surveys[] = [
+				'title'       => $survey->getTitle(),
+				'description' => $survey->getDescription(),
+				'form_schema' => $survey->getFormSchema(),
+				'settings'    => $survey->getSettings(),
+				'styling'     => $survey->getStyling(),
+			];
+		}
+
+		if ( $surveys === [] ) {
+			return $this->notFoundResponse( __( 'Survey', 'allfeedback' ) );
+		}
+
+		$this->logger->info(
+			'Surveys exported.',
+			[
+				'count'   => count( $surveys ),
+				'user_id' => get_current_user_id(),
+			]
+		);
+
+		return $this->successResponse(
+			[
+				'plugin'      => 'allfeedback',
+				'version'     => Constants::VERSION,
+				'exported_at' => gmdate( 'c' ),
+				'surveys'     => $surveys,
+			]
+		);
+	}
+
+	/**
+	 * POST /allfeedback/v1/surveys/import
+	 *
+	 * Create a draft survey for each entry of an export bundle.
+	 *
+	 * @param  \WP_REST_Request $request Full request data.
+	 * @return \WP_REST_Response|\WP_Error
+	 * @since  1.1.0
+	 */
+	public function import( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
+		$items = $request->get_param( 'surveys' );
+
+		if ( ! is_array( $items ) || $items === [] ) {
+			return $this->errorResponse( __( 'The file has no surveys to import.', 'allfeedback' ), 422 );
+		}
+
+		$imported = [];
+		$failed   = [];
+
+		foreach ( array_values( $items ) as $index => $item ) {
+			$item  = $this->normaliseJsonParam( $item ) ?? [];
+			$title = sanitize_text_field( (string) ( $item['title'] ?? '' ) );
+
+			if ( $title === '' ) {
+				$failed[] = [
+					'index'  => $index,
+					'title'  => '',
+					'reason' => __( 'Missing title.', 'allfeedback' ),
+				];
+				continue;
+			}
+
+			foreach ( [ $this->validateFormSchema( $item['form_schema'] ?? null ), $this->validateSettings( $item['settings'] ?? null ), $this->validateStyling( $item['styling'] ?? null ) ] as $check ) {
+				if ( is_wp_error( $check ) ) {
+					$failed[] = [
+						'index'  => $index,
+						'title'  => $title,
+						'reason' => $check->get_error_message(),
+					];
+					continue 2;
+				}
+			}
+
+			$survey = new Survey(
+				title:       $title,
+				description: wp_kses_post( (string) ( $item['description'] ?? '' ) ),
+				form_schema: $this->normaliseJsonParam( $item['form_schema'] ?? null ) ?? [],
+				settings:    $this->normaliseJsonParam( $item['settings'] ?? null ) ?? [],
+				styling:     $this->normaliseJsonParam( $item['styling'] ?? null ) ?? [],
+				created_by:  get_current_user_id(),
+			);
+
+			try {
+				$imported[] = $this->prepareSurvey( $this->survey_repository->save( $survey ) );
+			} catch ( \RuntimeException $e ) {
+				$this->logger->error(
+					'Survey import failed at DB layer.',
+					[
+						'title' => $title,
+						'error' => $e->getMessage(),
+					]
+				);
+				$failed[] = [
+					'index'  => $index,
+					'title'  => $title,
+					'reason' => __( 'Failed to save survey.', 'allfeedback' ),
+				];
+			}
+		}
+
+		$this->logger->info(
+			'Surveys imported.',
+			[
+				'imported' => count( $imported ),
+				'failed'   => count( $failed ),
+				'user_id'  => get_current_user_id(),
+			]
+		);
+
+		return $this->successResponse(
+			[
+				'imported' => count( $imported ),
+				'surveys'  => $imported,
+				'failed'   => $failed,
+			],
+			$imported !== [] ? 201 : 200
 		);
 	}
 
@@ -973,8 +1157,9 @@ class SurveysController extends RestController {
 			'settings'        => $settings !== [] ? $settings : null,
 			'styling'         => $styling !== [] ? $styling : null,
 			'status'          => $survey->getStatus()->value,
-			'conflict_reason' => $survey->getConflictReason(),
-			'response_count'  => $survey->getResponseCount(),
+			'conflict_reason'  => $survey->getConflictReason(),
+			'missing_features' => $survey->getMissingFeatures(),
+			'response_count'   => $survey->getResponseCount(),
 			'created_by'      => $survey->getCreatedBy() !== 0 ? $survey->getCreatedBy() : null,
 			'created_at'      => $survey->getCreatedAt()->format( 'Y-m-d H:i:s' ),
 			'updated_at'      => $survey->getUpdatedAt()?->format( 'Y-m-d H:i:s' ),
@@ -1084,6 +1269,10 @@ class SurveysController extends RestController {
 
 		do_action( 'allfeedback_survey_updated', $survey );
 
+		if ( $status === SurveyStatus::Published && $survey->getStatus()->isPublished() ) {
+			$this->draftInactiveOverlaps( $survey );
+		}
+
 		if ( $survey->getStatus()->isPublished() && ! $previous_status->isPublished() ) {
 			do_action( 'allfeedback_survey_activated', $survey );
 		}
@@ -1092,7 +1281,10 @@ class SurveysController extends RestController {
 	}
 
 	/**
-	 * Detect published surveys whose targeting overlaps with $published.
+	 * Detect live surveys whose targeting overlaps with $published.
+	 *
+	 * Inactive surveys (published but missing add-on features) are not shown
+	 * to visitors, so they never block publishing.
 	 *
 	 * Returns an array of conflict descriptors (id, title, targeting_scope).
 	 *
@@ -1101,6 +1293,82 @@ class SurveysController extends RestController {
 	 * @since  1.0.0
 	 */
 	private function detectPublishingConflicts( Survey $published ): array {
+		$conflicts = [];
+
+		foreach ( $this->findOverlappingPublished( $published ) as $other ) {
+			if ( ! $other->isLive() ) {
+				continue;
+			}
+
+			$conflicts[] = [
+				'id'              => $other->getId(),
+				'title'           => $other->getTitle(),
+				'targeting_scope' => $this->targetingScope( $other ),
+			];
+		}
+
+		return $conflicts;
+	}
+
+	/**
+	 * Move inactive surveys that overlap a newly published survey back to draft.
+	 *
+	 * Keeps the newly published survey live when the add-on comes back, instead
+	 * of two surveys competing for the same pages.
+	 *
+	 * @param  Survey $published The survey that was just published.
+	 * @return void
+	 * @since  1.1.0
+	 */
+	private function draftInactiveOverlaps( Survey $published ): void {
+		foreach ( $this->findOverlappingPublished( $published ) as $other ) {
+			if ( $other->isLive() ) {
+				continue;
+			}
+
+			$other->restore();
+			$other->setConflictReason(
+				sprintf(
+					/* translators: %s: title of the survey that now targets the same pages */
+					__( 'Saved as draft — same pages now targeted by "%s".', 'allfeedback' ),
+					$published->getTitle()
+				)
+			);
+
+			try {
+				$this->survey_repository->save( $other );
+			} catch ( \RuntimeException $e ) {
+				$this->logger->error(
+					'Failed to move inactive overlapping survey to draft.',
+					[
+						'survey_id'    => $other->getId(),
+						'published_id' => $published->getId(),
+						'error'        => $e->getMessage(),
+					]
+				);
+				continue;
+			}
+
+			$this->logger->info(
+				'Inactive overlapping survey moved to draft.',
+				[
+					'survey_id'    => $other->getId(),
+					'published_id' => $published->getId(),
+				]
+			);
+
+			do_action( 'allfeedback_survey_updated', $other );
+		}
+	}
+
+	/**
+	 * Find other published surveys whose targeting overlaps with $survey.
+	 *
+	 * @param  Survey $survey The survey to compare against.
+	 * @return Survey[]
+	 * @since  1.1.0
+	 */
+	private function findOverlappingPublished( Survey $survey ): array {
 		try {
 			$others = $this->survey_repository->findAll(
 				new SurveyFilter( status: SurveyStatus::Published, per_page: 200 )
@@ -1109,45 +1377,40 @@ class SurveysController extends RestController {
 			return [];
 		}
 
-		$published_id       = $published->getId();
-		$published_scope    = $this->targetingScope( $published );
-		$published_page_ids = $this->targetingPageIds( $published );
+		$survey_id       = $survey->getId();
+		$survey_scope    = $this->targetingScope( $survey );
+		$survey_page_ids = $this->targetingPageIds( $survey );
+		$overlapping     = [];
 
-		$conflicts = [];
+		// Embed-only surveys never auto-show, so they can't compete for a page.
+		if ( $survey_scope === 'embed_only' ) {
+			return [];
+		}
 
 		foreach ( $others as $other ) {
-			if ( $other->getId() === $published_id ) {
+			$other_scope = $this->targetingScope( $other );
+
+			if ( $other->getId() === $survey_id || $other_scope === 'embed_only' ) {
 				continue;
 			}
 
-			$other_scope    = $this->targetingScope( $other );
-			$other_page_ids = $this->targetingPageIds( $other );
-
-			$overlaps = false;
-
-			if ( $published_scope === 'all_pages' || $other_scope === 'all_pages' ) {
-				$overlaps = true;
-			} elseif ( ! empty( array_intersect( $published_page_ids, $other_page_ids ) ) ) {
-				$overlaps = true;
-			}
-
-			if ( $overlaps ) {
-				$conflicts[] = [
-					'id'              => $other->getId(),
-					'title'           => $other->getTitle(),
-					'targeting_scope' => $other_scope,
-				];
+			if (
+				$survey_scope === 'all_pages'
+				|| $other_scope === 'all_pages'
+				|| ! empty( array_intersect( $survey_page_ids, $this->targetingPageIds( $other ) ) )
+			) {
+				$overlapping[] = $other;
 			}
 		}
 
-		return $conflicts;
+		return $overlapping;
 	}
 
 	/**
 	 * Return a human-readable targeting scope string for a survey.
 	 *
 	 * @param  Survey $survey Survey aggregate to inspect.
-	 * @return string Either 'all_pages' or 'specific_pages'.
+	 * @return string One of 'all_pages', 'specific_pages' or 'embed_only'.
 	 * @since  1.0.0
 	 */
 	private function targetingScope( Survey $survey ): string {
@@ -1160,6 +1423,9 @@ class SurveysController extends RestController {
 		}
 
 		$target_pages = (string) ( $settings['targetPages'] ?? $settings['target_pages'] ?? 'all' );
+		if ( $target_pages === 'none' ) {
+			return 'embed_only';
+		}
 		return $target_pages === 'all' ? 'all_pages' : 'specific_pages';
 	}
 

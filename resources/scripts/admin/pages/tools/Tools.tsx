@@ -1,14 +1,18 @@
 import { Link, Outlet, useRouterState } from '@tanstack/react-router';
 import { cn } from '@/lib/utils';
 import { __ } from '@wordpress/i18n';
-import { Info, ScrollText, Wand2 } from 'lucide-react';
+import { ArrowLeftRight, Info, ScrollText, Wand2 } from 'lucide-react';
 
 declare const __ALLFB_ADMIN__: { debug: boolean };
 
 type NavItem = {
 	label: string;
 	icon: React.ComponentType<{ className?: string }>;
-	to: '/tools/system-info' | '/tools/logs' | '/tools/dev-tools';
+	to:
+		| '/tools/system-info'
+		| '/tools/logs'
+		| '/tools/import-export'
+		| '/tools/dev-tools';
 };
 
 const NAV_ITEMS: NavItem[] = [
@@ -21,6 +25,11 @@ const NAV_ITEMS: NavItem[] = [
 		label: __('Logs', 'allfeedback'),
 		icon: ScrollText,
 		to: '/tools/logs',
+	},
+	{
+		label: __('Import / Export', 'allfeedback'),
+		icon: ArrowLeftRight,
+		to: '/tools/import-export',
 	},
 	...( __ALLFB_ADMIN__.debug ? [{
 		label: __('Dev Tools', 'allfeedback'),

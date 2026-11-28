@@ -31,7 +31,10 @@ import {
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import BuilderCanvas from './builder/BuilderCanvas';
+import { computeRequiredFeatures } from './builder/extensions';
+import { INACTIVE_FORM_MESSAGE } from './inactiveForm';
 import PreviewPanel from './builder/PreviewPanel';
+import { getInitialPreviewWidth, PREVIEW_WIDTH_KEY } from './builder/previewWidth';
 import SettingsPanel from './builder/SettingsPanel';
 import StylingPanel from './builder/StylingPanel';
 import type {
@@ -60,6 +63,29 @@ const TABS: {
 	{ value: 'styling', label: __('Styling', 'allfeedback'), Icon: Palette },
 	{ value: 'settings', label: __('Settings', 'allfeedback'), Icon: Settings2 },
 ];
+
+const CORE_SETTING_KEYS = [
+	'placeholder',
+	'options',
+	'starScale',
+	'starRange',
+	'scaleMin',
+	'scaleMax',
+	'scaleLowLabel',
+	'scaleHighLabel',
+];
+
+/** Settings saved by extensions (anything that isn't a core field setting). */
+const extraSettings = (
+	settings: Record<string, unknown>,
+): { settings?: Record<string, unknown> } => {
+	const extra = Object.fromEntries(
+		Object.entries(settings ?? {}).filter(
+			([key]) => !CORE_SETTING_KEYS.includes(key),
+		),
+	);
+	return Object.keys(extra).length ? { settings: extra } : {};
+};
 
 const deserializeFormSchema = (
 	schema: SurveyFormSchema | null,
@@ -98,6 +124,7 @@ const deserializeFormSchema = (
 				...(field.settings.scaleHighLabel !== undefined && {
 					scaleHighLabel: field.settings.scaleHighLabel as string,
 				}),
+				...extraSettings(field.settings),
 			}),
 		),
 	}));
@@ -109,7 +136,10 @@ const serializeSettings = (s: FormSettings): Record<string, unknown> => ({
 	back_label: s.backLabel,
 	user_state: s.userState,
 
-	target_pages: s.targetPages === 'all' ? 'all' : 'specific',
+	target_pages:
+		s.targetPages === 'all' || s.targetPages === 'none'
+			? s.targetPages
+			: 'specific',
 
 	target_page_ids:
 		s.targetPages === 'specific_pages'
@@ -157,13 +187,17 @@ const deserializeSettings = (
 		userState: raw.user_state as FormSettings['userState'],
 	}),
 
+	// Saved surveys without a value show on all pages (matches the frontend),
+	// so only brand-new surveys start with auto-show off.
 	...(raw.targetPages !== undefined
 		? { targetPages: raw.targetPages as FormSettings['targetPages'] }
-		: raw.target_pages !== undefined && {
+		: {
 				targetPages:
-					raw.target_pages === 'specific'
-						? 'specific_pages'
-						: (raw.target_pages as FormSettings['targetPages']),
+					raw.target_pages === undefined
+						? 'all'
+						: raw.target_pages === 'specific'
+							? 'specific_pages'
+							: (raw.target_pages as FormSettings['targetPages']),
 			}),
 
 	...(raw.targetPageIds !== undefined
@@ -247,8 +281,12 @@ const deserializeStyling = (
 	}),
 });
 
-const serializeFormSchema = (sections: FormSection[]): SurveyFormSchema => ({
+const serializeFormSchema = (
+	sections: FormSection[],
+	requires: string[],
+): SurveyFormSchema => ({
 	version: '1.0',
+	...(requires.length && { requires }),
 	sections: sections.map((section) => ({
 		id: section.id,
 		title: section.title,
@@ -258,6 +296,7 @@ const serializeFormSchema = (sections: FormSection[]): SurveyFormSchema => ({
 			label: field.label,
 			required: field.required,
 			settings: {
+				...field.settings,
 				...(field.placeholder !== undefined && {
 					placeholder: field.placeholder,
 				}),
@@ -292,6 +331,8 @@ const FormBuilder = () => {
 
 	const [surveyStatus, setSurveyStatus] = useState<SurveyStatus>('draft');
 	const [conflictWarning, setConflictWarning] = useState<string | null>(null);
+	const [missingFeatures, setMissingFeatures] = useState<string[]>([]);
+	const requiredFeaturesRef = useRef<string[]>([]);
 
 	const submitActionRef = useRef<'publish' | 'draft' | 'trashed'>('draft');
 
@@ -305,9 +346,13 @@ const FormBuilder = () => {
 			if (!formId) return;
 			const action = submitActionRef.current;
 
+			const requires = computeRequiredFeatures(
+				value.sections,
+				requiredFeaturesRef.current,
+			);
 			const saveData: Parameters<typeof surveysApi.update>[1] = {
 				title: value.title,
-				form_schema: serializeFormSchema(value.sections),
+				form_schema: serializeFormSchema(value.sections, requires),
 				settings: serializeSettings(value.settings),
 				styling: serializeStyling(value.settings),
 			};
@@ -317,6 +362,8 @@ const FormBuilder = () => {
 			}
 
 			const updated = await surveysApi.update(formId, saveData);
+			requiredFeaturesRef.current = requires;
+			setMissingFeatures(updated.missing_features ?? []);
 			setIsDirty(false);
 			queryClient.setQueryData(surveyQuery(formId).queryKey, updated);
 
@@ -324,6 +371,7 @@ const FormBuilder = () => {
 				const published = await surveysApi.publish(formId);
 				setSurveyStatus(published.status);
 				setConflictWarning(published.conflict_reason ?? null);
+				setMissingFeatures(published.missing_features ?? []);
 				queryClient.setQueryData(surveyQuery(formId).queryKey, published);
 				void queryClient.invalidateQueries({ queryKey: ['surveys'] });
 
@@ -334,6 +382,11 @@ const FormBuilder = () => {
 							'allfeedback',
 						),
 					);
+					return;
+				}
+
+				if (published.missing_features?.length) {
+					toast.warning(INACTIVE_FORM_MESSAGE);
 					return;
 				}
 
@@ -389,19 +442,9 @@ const FormBuilder = () => {
 
 	const [activeSectionIndex, setActiveSectionIndex] = useState(-1);
 	const [canvasScrolled, setCanvasScrolled] = useState(false);
-	const [canvasProgress, setCanvasProgress] = useState(0);
 	const [settingsScrolled, setSettingsScrolled] = useState(false);
-	const [settingsProgress, setSettingsProgress] = useState(0);
 	const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
-	const [previewWidth, setPreviewWidth] = useState(() => {
-		const saved = localStorage.getItem('allfeedback_preview_width');
-		if (saved) {
-			const n = parseInt(saved, 10);
-			if (!isNaN(n) && n >= 280)
-				return Math.min(n, Math.round(window.innerWidth * 0.72));
-		}
-		return Math.round(window.innerWidth * 0.3);
-	});
+	const [previewWidth, setPreviewWidth] = useState(getInitialPreviewWidth);
 	const [publishMenuOpen, setPublishMenuOpen] = useState(false);
 	const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -431,6 +474,8 @@ const FormBuilder = () => {
 		};
 		setSurveyStatus(surveyData.status);
 		setConflictWarning(surveyData.conflict_reason ?? null);
+		setMissingFeatures(surveyData.missing_features ?? []);
+		requiredFeaturesRef.current = surveyData.form_schema?.requires ?? [];
 		historyRef.current = [loadedSections];
 		setHistoryIdx(0);
 
@@ -581,7 +626,7 @@ const FormBuilder = () => {
 					Math.min(Math.round(window.innerWidth * 0.72), startWidth + delta),
 				);
 				setPreviewWidth(next);
-				localStorage.setItem('allfeedback_preview_width', String(next));
+				localStorage.setItem(PREVIEW_WIDTH_KEY, String(next));
 			};
 			const onUp = () => {
 				document.removeEventListener('mousemove', onMove);
@@ -914,6 +959,18 @@ const FormBuilder = () => {
 				</div>
 			</header>
 
+			{missingFeatures.length > 0 && (
+				<div className="border-warning/20 bg-warning-subtle flex shrink-0 items-center gap-2 border-b px-6 py-1.5">
+					<AlertTriangle className="text-warning-foreground/60 size-3.5 shrink-0" />
+					<p className="text-warning-foreground/90 flex-1 text-xs">
+						<span className="font-semibold">
+							{__('Inactive:', 'allfeedback')}
+						</span>{' '}
+						{INACTIVE_FORM_MESSAGE}
+					</p>
+				</div>
+			)}
+
 			{conflictWarning && (
 				<div className="border-warning/20 bg-warning-subtle flex shrink-0 items-center gap-2 border-b px-6 py-1.5">
 					<AlertTriangle className="text-warning-foreground/60 size-3.5 shrink-0" />
@@ -973,23 +1030,6 @@ const FormBuilder = () => {
 								</Fragment>
 							);
 						})}
-
-						{activeTab === 'builder' && canvasScrolled && (
-							<div className="bg-border/40 absolute inset-x-0 bottom-0 h-[2px]">
-								<div
-									className="bg-primary/60 h-full transition-[width] duration-75"
-									style={{ width: `${canvasProgress * 100}%` }}
-								/>
-							</div>
-						)}
-						{activeTab === 'settings' && settingsScrolled && (
-							<div className="bg-border/40 absolute inset-x-0 bottom-0 h-[2px]">
-								<div
-									className="bg-primary/60 h-full transition-[width] duration-75"
-									style={{ width: `${settingsProgress * 100}%` }}
-								/>
-							</div>
-						)}
 					</div>
 
 					<div className="flex flex-1 overflow-hidden">
@@ -997,11 +1037,9 @@ const FormBuilder = () => {
 							<BuilderCanvas
 								sections={sections}
 								onSectionsChange={handleSectionsChange}
+								activeSectionIndex={activeSectionIndex}
 								onActiveSectionChange={setActiveSectionIndex}
-								onScrollChange={(scrolled, progress) => {
-									setCanvasScrolled(scrolled);
-									setCanvasProgress(progress);
-								}}
+								onScrollChange={setCanvasScrolled}
 							/>
 						)}
 
@@ -1009,10 +1047,7 @@ const FormBuilder = () => {
 							<SettingsPanel
 								settings={settings}
 								onChange={handleSettingsChange}
-								onScrollChange={(scrolled, progress) => {
-									setSettingsScrolled(scrolled);
-									setSettingsProgress(progress);
-								}}
+								onScrollChange={setSettingsScrolled}
 							/>
 						)}
 
@@ -1055,6 +1090,7 @@ const FormBuilder = () => {
 						surveyId={formId ?? undefined}
 						surveyStatus={surveyStatus}
 						activeSectionIndex={activeSectionIndex}
+						onActiveSectionChange={setActiveSectionIndex}
 					/>
 				</div>
 			</div>

@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { __ } from '@wordpress/i18n';
+import { useRef } from 'react';
 import type {
 	DelayUnit,
 	DismissUnit,
@@ -24,7 +25,7 @@ import type {
 interface SettingsPanelProps {
 	settings: FormSettings;
 	onChange: (settings: FormSettings) => void;
-	onScrollChange?: (scrolled: boolean, progress: number) => void;
+	onScrollChange?: (scrolled: boolean) => void;
 }
 
 const labelCls = 'text-base font-normal text-foreground/90';
@@ -144,7 +145,7 @@ const NumberWithUnit = <U extends string>({
 	</div>
 );
 
-const PAGE_OPTIONS: { value: TargetPages; label: string }[] = [
+const PAGE_OPTIONS: { value: Exclude<TargetPages, 'none'>; label: string }[] = [
 	{ value: 'all', label: __('All', 'allfeedback') },
 	{ value: 'specific_pages', label: __('Specific Pages', 'allfeedback') },
 	{ value: 'specific_posts', label: __('Specific Posts', 'allfeedback') },
@@ -170,14 +171,15 @@ const SettingsPanel = ({
 	const update = (patch: Partial<FormSettings>) =>
 		onChange({ ...settings, ...patch });
 
+	const showAutomatically = settings.targetPages !== 'none';
+	// Restores the last "Show on" choice when auto-show is turned back on.
+	const lastTargetPages = useRef<Exclude<TargetPages, 'none'>>('all');
+	if (settings.targetPages !== 'none') {
+		lastTargetPages.current = settings.targetPages;
+	}
+
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const el = e.currentTarget;
-		const scrolled = el.scrollTop > 0;
-		const progress =
-			el.scrollHeight <= el.clientHeight
-				? 0
-				: el.scrollTop / (el.scrollHeight - el.clientHeight);
-		onScrollChange?.(scrolled, progress);
+		onScrollChange?.(e.currentTarget.scrollTop > 0);
 	};
 
 	return (
@@ -219,13 +221,33 @@ const SettingsPanel = ({
 							</SelectContent>
 						</Select>
 					</Row>
-					<Row label={__('Show on', 'allfeedback')}>
-						<Chips
-							options={PAGE_OPTIONS}
-							value={settings.targetPages}
-							onChange={(v) => update({ targetPages: v })}
+					<Row label={__('Show automatically', 'allfeedback')}>
+						<Switch
+							checked={showAutomatically}
+							onCheckedChange={(on) =>
+								update({
+									targetPages: on ? lastTargetPages.current : 'none',
+								})
+							}
 						/>
 					</Row>
+					{!showAutomatically && (
+						<p className="text-muted-foreground text-sm">
+							{__(
+								'This survey only appears where you embed it with its shortcode or block.',
+								'allfeedback',
+							)}
+						</p>
+					)}
+					{showAutomatically && (
+						<Row label={__('Show on', 'allfeedback')}>
+							<Chips
+								options={PAGE_OPTIONS}
+								value={lastTargetPages.current}
+								onChange={(v) => update({ targetPages: v })}
+							/>
+						</Row>
+					)}
 					<div>
 						<Collapse open={settings.targetPages === 'specific_pages'}>
 							<Row label={__('Select pages', 'allfeedback')}>
@@ -250,87 +272,91 @@ const SettingsPanel = ({
 					</div>
 				</Card>
 
-				<Card title={__('Trigger', 'allfeedback')}>
-					<Row label={__('When to appear', 'allfeedback')}>
-						<Select
-							value={settings.triggerType}
-							onValueChange={(v) => update({ triggerType: v as TriggerType })}
-						>
-							<SelectTrigger className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent className="z-[100000]">
-								<SelectItem value="immediate">
-									{__('Page load — Immediately', 'allfeedback')}
-								</SelectItem>
-								<SelectItem value="time_delay">
-									{__('Page load — After a delay', 'allfeedback')}
-								</SelectItem>
-							</SelectContent>
-						</Select>
-					</Row>
-					<Collapse open={settings.triggerType === 'time_delay'}>
-						<Row label={__('Delay', 'allfeedback')}>
-							<NumberWithUnit
-								numberValue={settings.delayValue}
-								unit={settings.delayUnit}
-								unitOptions={DELAY_UNIT_OPTIONS}
-								onNumberChange={(v) => update({ delayValue: v })}
-								onUnitChange={(v) => update({ delayUnit: v })}
-								min={1}
-							/>
-						</Row>
-					</Collapse>
-				</Card>
+				{showAutomatically && (
+					<>
+						<Card title={__('Trigger', 'allfeedback')}>
+							<Row label={__('When to appear', 'allfeedback')}>
+								<Select
+									value={settings.triggerType}
+									onValueChange={(v) => update({ triggerType: v as TriggerType })}
+								>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent className="z-[100000]">
+										<SelectItem value="immediate">
+											{__('Page load — Immediately', 'allfeedback')}
+										</SelectItem>
+										<SelectItem value="time_delay">
+											{__('Page load — After a delay', 'allfeedback')}
+										</SelectItem>
+									</SelectContent>
+								</Select>
+							</Row>
+							<Collapse open={settings.triggerType === 'time_delay'}>
+								<Row label={__('Delay', 'allfeedback')}>
+									<NumberWithUnit
+										numberValue={settings.delayValue}
+										unit={settings.delayUnit}
+										unitOptions={DELAY_UNIT_OPTIONS}
+										onNumberChange={(v) => update({ delayValue: v })}
+										onUnitChange={(v) => update({ delayUnit: v })}
+										min={1}
+									/>
+								</Row>
+							</Collapse>
+						</Card>
 
-				<Card title={__('Frequency & Limits', 'allfeedback')}>
-					<Row label={__('Display frequency', 'allfeedback')}>
-						<Select
-							value={settings.displayFrequency}
-							onValueChange={(v) =>
-								update({ displayFrequency: v as DisplayFrequency })
-							}
-						>
-							<SelectTrigger className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent className="z-[100000]">
-								<SelectItem value="until_submit">
-									{__('Until submitted', 'allfeedback')}
-								</SelectItem>
-								<SelectItem value="once">
-									{__('Once only', 'allfeedback')}
-								</SelectItem>
-							</SelectContent>
-						</Select>
-					</Row>
-					<Collapse open={settings.displayFrequency === 'until_submit'}>
-						<div className="space-y-4">
-							<Row label={__('Max impressions', 'allfeedback')}>
-								<Input
-									type="number"
-									min={0}
-									value={settings.maxImpressions}
-									onChange={(e) =>
-										update({
-											maxImpressions: Math.max(0, Number(e.target.value)),
-										})
+						<Card title={__('Frequency & Limits', 'allfeedback')}>
+							<Row label={__('Display frequency', 'allfeedback')}>
+								<Select
+									value={settings.displayFrequency}
+									onValueChange={(v) =>
+										update({ displayFrequency: v as DisplayFrequency })
 									}
-									className="w-24"
-								/>
+								>
+									<SelectTrigger className="w-full">
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent className="z-[100000]">
+										<SelectItem value="until_submit">
+											{__('Until submitted', 'allfeedback')}
+										</SelectItem>
+										<SelectItem value="once">
+											{__('Once only', 'allfeedback')}
+										</SelectItem>
+									</SelectContent>
+								</Select>
 							</Row>
-							<Row label={__('Re-show after dismissal', 'allfeedback')}>
-								<NumberWithUnit
-									numberValue={settings.dismissWaitValue}
-									unit={settings.dismissWaitUnit}
-									unitOptions={DISMISS_UNIT_OPTIONS}
-									onNumberChange={(v) => update({ dismissWaitValue: v })}
-									onUnitChange={(v) => update({ dismissWaitUnit: v })}
-								/>
-							</Row>
-						</div>
-					</Collapse>
-				</Card>
+							<Collapse open={settings.displayFrequency === 'until_submit'}>
+								<div className="space-y-4">
+									<Row label={__('Max impressions', 'allfeedback')}>
+										<Input
+											type="number"
+											min={0}
+											value={settings.maxImpressions}
+											onChange={(e) =>
+												update({
+													maxImpressions: Math.max(0, Number(e.target.value)),
+												})
+											}
+											className="w-24"
+										/>
+									</Row>
+									<Row label={__('Re-show after dismissal', 'allfeedback')}>
+										<NumberWithUnit
+											numberValue={settings.dismissWaitValue}
+											unit={settings.dismissWaitUnit}
+											unitOptions={DISMISS_UNIT_OPTIONS}
+											onNumberChange={(v) => update({ dismissWaitValue: v })}
+											onUnitChange={(v) => update({ dismissWaitUnit: v })}
+										/>
+									</Row>
+								</div>
+							</Collapse>
+						</Card>
+					</>
+				)}
 
 				<Card title={__('Thank You Page', 'allfeedback')}>
 					<Row label={__('Enable', 'allfeedback')}>

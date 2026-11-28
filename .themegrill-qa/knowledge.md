@@ -8,9 +8,9 @@
 > maintainer. The agents trust this file: an unreviewed guess here produces
 > confident wrong QA.
 
-## ⚠ OPEN BUG — the Gutenberg block fatals every page it is on
+## FIXED — the Gutenberg block fatalled every page it was on
 
-**Severity: site-down for any page using the block. Found 2026-09-07, unfixed.**
+**Severity: site-down for any page using the block. Found 2026-09-07, fixed 2026-11-28 by splitting the line.**
 
 `src/Frontend/Blocks/SurveyBlock.php:105` is a single physical line reading,
 in effect:
@@ -50,10 +50,9 @@ fragility the fragile-areas section below flags: PHPCS was driven to zero twice
 **The fix is to put the assignment on its own line.** Nothing else is wrong with
 the method.
 
-Pinned in `tests/e2e/specs/building-forms/block-embed.spec.ts`: the three specs
-asserting correct behaviour are marked `test.fail()`, so the suite stays green
-while the bug stands and starts failing the moment it is fixed — at which point
-delete the markers. A fourth spec proves `surveyId: 0` is safe, and a fifth
+Guarded in `tests/e2e/specs/building-forms/block-embed.spec.ts`: the three specs
+asserting correct behaviour were `test.fail()` markers until the fix and now run
+as plain regression specs. A fourth spec proves `surveyId: 0` is safe, and a fifth
 proves the shortcode still works.
 
 ---
@@ -579,8 +578,8 @@ Further candidates, unconfirmed:
 
 `tests/e2e/`, driven by `playwright.config.ts`, manifested in
 `.themegrill-qa/suite.json`. **73 specs, all `@fresh`, green twice** against
-1.0.0 on 2026-09-07 (~46s, identical timing across runs). Three of the 73 are
-`test.fail()` markers pinning the block bug above.
+1.0.0 on 2026-09-07 (~46s, identical timing across runs). Three of the 73 were
+`test.fail()` markers for the block bug above until it was fixed.
 
 ```
 tests/e2e/
