@@ -515,6 +515,10 @@ class SurveysController extends RestController {
 
 		do_action( 'allfeedback_survey_updated', $survey );
 
+		if ( $transitioning_to_published && $survey->getStatus()->isPublished() ) {
+			$this->draftInactiveOverlaps( $survey );
+		}
+
 		if ( $transitioning_to_published && $survey->getStatus()->isPublished() && ! $previous_status->isPublished() ) {
 			do_action( 'allfeedback_survey_activated', $survey );
 		}
@@ -1264,6 +1268,10 @@ class SurveysController extends RestController {
 
 		do_action( 'allfeedback_survey_updated', $survey );
 
+		if ( $status === SurveyStatus::Published && $survey->getStatus()->isPublished() ) {
+			$this->draftInactiveOverlaps( $survey );
+		}
+
 		if ( $survey->getStatus()->isPublished() && ! $previous_status->isPublished() ) {
 			do_action( 'allfeedback_survey_activated', $survey );
 		}
@@ -1272,7 +1280,10 @@ class SurveysController extends RestController {
 	}
 
 	/**
-	 * Detect published surveys whose targeting overlaps with $published.
+	 * Detect live surveys whose targeting overlaps with $published.
+	 *
+	 * Inactive surveys (published but missing add-on features) are not shown
+	 * to visitors, so they never block publishing.
 	 *
 	 * Returns an array of conflict descriptors (id, title, targeting_scope).
 	 *
@@ -1281,6 +1292,82 @@ class SurveysController extends RestController {
 	 * @since  1.0.0
 	 */
 	private function detectPublishingConflicts( Survey $published ): array {
+		$conflicts = [];
+
+		foreach ( $this->findOverlappingPublished( $published ) as $other ) {
+			if ( ! $other->isLive() ) {
+				continue;
+			}
+
+			$conflicts[] = [
+				'id'              => $other->getId(),
+				'title'           => $other->getTitle(),
+				'targeting_scope' => $this->targetingScope( $other ),
+			];
+		}
+
+		return $conflicts;
+	}
+
+	/**
+	 * Move inactive surveys that overlap a newly published survey back to draft.
+	 *
+	 * Keeps the newly published survey live when the add-on comes back, instead
+	 * of two surveys competing for the same pages.
+	 *
+	 * @param  Survey $published The survey that was just published.
+	 * @return void
+	 * @since  1.1.0
+	 */
+	private function draftInactiveOverlaps( Survey $published ): void {
+		foreach ( $this->findOverlappingPublished( $published ) as $other ) {
+			if ( $other->isLive() ) {
+				continue;
+			}
+
+			$other->restore();
+			$other->setConflictReason(
+				sprintf(
+					/* translators: %s: title of the survey that now targets the same pages */
+					__( 'Saved as draft — same pages now targeted by "%s".', 'allfeedback' ),
+					$published->getTitle()
+				)
+			);
+
+			try {
+				$this->survey_repository->save( $other );
+			} catch ( \RuntimeException $e ) {
+				$this->logger->error(
+					'Failed to move inactive overlapping survey to draft.',
+					[
+						'survey_id'    => $other->getId(),
+						'published_id' => $published->getId(),
+						'error'        => $e->getMessage(),
+					]
+				);
+				continue;
+			}
+
+			$this->logger->info(
+				'Inactive overlapping survey moved to draft.',
+				[
+					'survey_id'    => $other->getId(),
+					'published_id' => $published->getId(),
+				]
+			);
+
+			do_action( 'allfeedback_survey_updated', $other );
+		}
+	}
+
+	/**
+	 * Find other published surveys whose targeting overlaps with $survey.
+	 *
+	 * @param  Survey $survey The survey to compare against.
+	 * @return Survey[]
+	 * @since  1.1.0
+	 */
+	private function findOverlappingPublished( Survey $survey ): array {
 		try {
 			$others = $this->survey_repository->findAll(
 				new SurveyFilter( status: SurveyStatus::Published, per_page: 200 )
@@ -1289,38 +1376,28 @@ class SurveysController extends RestController {
 			return [];
 		}
 
-		$published_id       = $published->getId();
-		$published_scope    = $this->targetingScope( $published );
-		$published_page_ids = $this->targetingPageIds( $published );
-
-		$conflicts = [];
+		$survey_id       = $survey->getId();
+		$survey_scope    = $this->targetingScope( $survey );
+		$survey_page_ids = $this->targetingPageIds( $survey );
+		$overlapping     = [];
 
 		foreach ( $others as $other ) {
-			if ( $other->getId() === $published_id ) {
+			$other_scope = $this->targetingScope( $other );
+
+			if ( $other->getId() === $survey_id ) {
 				continue;
 			}
 
-			$other_scope    = $this->targetingScope( $other );
-			$other_page_ids = $this->targetingPageIds( $other );
-
-			$overlaps = false;
-
-			if ( $published_scope === 'all_pages' || $other_scope === 'all_pages' ) {
-				$overlaps = true;
-			} elseif ( ! empty( array_intersect( $published_page_ids, $other_page_ids ) ) ) {
-				$overlaps = true;
-			}
-
-			if ( $overlaps ) {
-				$conflicts[] = [
-					'id'              => $other->getId(),
-					'title'           => $other->getTitle(),
-					'targeting_scope' => $other_scope,
-				];
+			if (
+				$survey_scope === 'all_pages'
+				|| $other_scope === 'all_pages'
+				|| ! empty( array_intersect( $survey_page_ids, $this->targetingPageIds( $other ) ) )
+			) {
+				$overlapping[] = $other;
 			}
 		}
 
-		return $conflicts;
+		return $overlapping;
 	}
 
 	/**
