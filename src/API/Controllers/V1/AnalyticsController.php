@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 use AllFeedback\API\RestController;
 use AllFeedback\Application\Analytics\TrackSessionEventService;
 use AllFeedback\Domain\Analytics\SurveySessionRepository;
+use AllFeedback\Domain\Survey\SurveyRepository;
 
 /**
  * REST controller for survey session analytics.
@@ -98,7 +99,14 @@ class AnalyticsController extends RestController {
 			return $this->errorResponse( __( 'session_id is required.', 'allfeedback' ), 400 );
 		}
 
-		if ( ! $this->checkAnalyticsRateLimit( $session_id ) ) {
+		if ( ! $this->checkAnalyticsRateLimit( $session_id ) || ! $this->checkIpRateLimit() ) {
+			return $this->successResponse( null );
+		}
+
+		// Resolved here, not injected, so sites holding a compiled DI container for this version keep booting.
+		$survey = allfeedback_get_plugin_instance()->getContainer()->get( SurveyRepository::class )->findById( $survey_id );
+
+		if ( $survey === null || ( ! $survey->isLive() && ! current_user_can( 'manage_options' ) ) ) {
 			return $this->successResponse( null );
 		}
 
@@ -122,6 +130,33 @@ class AnalyticsController extends RestController {
 		$limit = max( 1, (int) apply_filters( 'allfeedback_analytics_rate_limit', 60 ) );
 		$key   = 'allfeedback_al_' . substr( hash( 'sha256', $session_id ), 0, 16 );
 		$count = (int) get_transient( $key );
+
+		if ( $count >= $limit ) {
+			return false;
+		}
+
+		set_transient( $key, $count + 1, 5 * MINUTE_IN_SECONDS );
+		return true;
+	}
+
+	/**
+	 * Rate-limit analytics events per visitor IP, so rotating session IDs cannot flood the table.
+	 *
+	 * @return bool True when under the limit; false when exceeded.
+	 * @since  1.1.1
+	 */
+	private function checkIpRateLimit(): bool {
+		/**
+		 * Filters the maximum analytics events one IP may send per 5-minute window.
+		 *
+		 * @since 1.1.1
+		 *
+		 * @param int $limit Events allowed per window. Default 300.
+		 */
+		$limit    = max( 1, (int) apply_filters( 'allfeedback_analytics_ip_rate_limit', 300 ) );
+		[ $hash ] = $this->resolveClientIp();
+		$key      = 'allfeedback_ai_' . substr( $hash, 0, 16 );
+		$count    = (int) get_transient( $key );
 
 		if ( $count >= $limit ) {
 			return false;
