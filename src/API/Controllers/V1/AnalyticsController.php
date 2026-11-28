@@ -143,13 +143,13 @@ class AnalyticsController extends RestController {
 	 * Rate-limit analytics events per visitor IP, so rotating session IDs cannot flood the table.
 	 *
 	 * @return bool True when under the limit; false when exceeded.
-	 * @since  1.1.1
+	 * @since  1.1.0
 	 */
 	private function checkIpRateLimit(): bool {
 		/**
 		 * Filters the maximum analytics events one IP may send per 5-minute window.
 		 *
-		 * @since 1.1.1
+		 * @since 1.1.0
 		 *
 		 * @param int $limit Events allowed per window. Default 300.
 		 */

@@ -90,5 +90,26 @@ Please use the support forum on WordPress.org, or reach our team via live chat a
 
 == Changelog ==
 
+= 1.1.0 - 2026-11-28 =
+* Add - Email question type with built-in email address validation.
+* Add - Import and export surveys from Tools > Import / Export.
+* Add - Show automatically toggle so a survey can be embed-only.
+* Add - Surveys go offline when the add-on features they use are inactive.
+* Add - Extension points for add-ons in the survey builder, widget and settings.
+* Tweak - Survey builder now supports pages, inline question editing and live preview.
+* Tweak - Add-on settings sections now save with the main Settings Save button.
+* Tweak - Removed the scroll progress bar from the survey builder tabs.
+* Fix - Unsafe HTML in question labels could run scripts in the survey widget.
+* Fix - Analytics endpoint accepted events for any survey without a per-visitor limit.
+* Fix - Pages containing the survey block crashed with a critical error.
+* Fix - Inactive surveys blocked publishing another survey on the same pages.
+* Fix - Page targeting search matched page content instead of only page titles.
+* Fix - Page targeting search returned no pages when another plugin changed the query.
+* Fix - Field list showed raw CSS when a question label contained a style tag.
+* Fix - Builder and preview disagreed on empty pages and after Reset.
+* Fix - Submit button appeared before an answer that reveals later pages.
+* Fix - Bulk deleting log files from the Logs screen always failed.
+* Fix - Survey settings filter for add-ons did not run when a survey was updated.
+
 = 1.0.0 - 2026-06-22 =
 * Initial release.
