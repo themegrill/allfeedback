@@ -350,7 +350,7 @@ class WpdbSurveyRepository implements SurveyRepository {
 	 *
 	 * @param  array<mixed> $schema Form schema, possibly holding stdClass nodes from a REST body.
 	 * @return array<mixed> Schema with every field label passed through wp_kses_post().
-	 * @since  1.1.1
+	 * @since  1.1.0
 	 */
 	private function sanitizeFormSchema( array $schema ): array {
 		$normalised = json_decode( (string) wp_json_encode( $schema ), true );
@@ -377,7 +377,7 @@ class WpdbSurveyRepository implements SurveyRepository {
 	 *
 	 * @param  array<mixed> $fields Field definitions.
 	 * @return array<mixed>
-	 * @since  1.1.1
+	 * @since  1.1.0
 	 */
 	private function sanitizeFieldLabels( array $fields ): array {
 		foreach ( $fields as $index => $field ) {
