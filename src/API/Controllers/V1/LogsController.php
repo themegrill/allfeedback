@@ -294,7 +294,8 @@ class LogsController extends RestController {
 	 * @since  1.0.0
 	 */
 	public function bulkDelete( \WP_REST_Request $request ): \WP_REST_Response|\WP_Error {
-		/** @var string[] $ids */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint		$ids = $request->get_param( 'ids' );
+		/** @var string[] $ids */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint
+		$ids = $request->get_param( 'ids' );
 
 		if ( empty( $ids ) || ! is_array( $ids ) ) {
 			return $this->errorResponse( __( 'No log IDs provided.', 'allfeedback' ), 422 );
