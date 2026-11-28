@@ -136,7 +136,10 @@ const serializeSettings = (s: FormSettings): Record<string, unknown> => ({
 	back_label: s.backLabel,
 	user_state: s.userState,
 
-	target_pages: s.targetPages === 'all' ? 'all' : 'specific',
+	target_pages:
+		s.targetPages === 'all' || s.targetPages === 'none'
+			? s.targetPages
+			: 'specific',
 
 	target_page_ids:
 		s.targetPages === 'specific_pages'
@@ -184,13 +187,17 @@ const deserializeSettings = (
 		userState: raw.user_state as FormSettings['userState'],
 	}),
 
+	// Saved surveys without a value show on all pages (matches the frontend),
+	// so only brand-new surveys start with auto-show off.
 	...(raw.targetPages !== undefined
 		? { targetPages: raw.targetPages as FormSettings['targetPages'] }
-		: raw.target_pages !== undefined && {
+		: {
 				targetPages:
-					raw.target_pages === 'specific'
-						? 'specific_pages'
-						: (raw.target_pages as FormSettings['targetPages']),
+					raw.target_pages === undefined
+						? 'all'
+						: raw.target_pages === 'specific'
+							? 'specific_pages'
+							: (raw.target_pages as FormSettings['targetPages']),
 			}),
 
 	...(raw.targetPageIds !== undefined

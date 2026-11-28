@@ -181,6 +181,10 @@ class TargetingEngine {
 			return true;
 		}
 
+		if ( $target_pages === 'none' ) {
+			return false;
+		}
+
 		$ids = array_values(
 			array_filter(
 				array_map( 'intval', (array) ( $settings['target_page_ids'] ?? [] ) ),

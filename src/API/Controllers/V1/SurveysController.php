@@ -1381,10 +1381,15 @@ class SurveysController extends RestController {
 		$survey_page_ids = $this->targetingPageIds( $survey );
 		$overlapping     = [];
 
+		// Embed-only surveys never auto-show, so they can't compete for a page.
+		if ( $survey_scope === 'embed_only' ) {
+			return [];
+		}
+
 		foreach ( $others as $other ) {
 			$other_scope = $this->targetingScope( $other );
 
-			if ( $other->getId() === $survey_id ) {
+			if ( $other->getId() === $survey_id || $other_scope === 'embed_only' ) {
 				continue;
 			}
 
@@ -1404,7 +1409,7 @@ class SurveysController extends RestController {
 	 * Return a human-readable targeting scope string for a survey.
 	 *
 	 * @param  Survey $survey Survey aggregate to inspect.
-	 * @return string Either 'all_pages' or 'specific_pages'.
+	 * @return string One of 'all_pages', 'specific_pages' or 'embed_only'.
 	 * @since  1.0.0
 	 */
 	private function targetingScope( Survey $survey ): string {
@@ -1417,6 +1422,9 @@ class SurveysController extends RestController {
 		}
 
 		$target_pages = (string) ( $settings['targetPages'] ?? $settings['target_pages'] ?? 'all' );
+		if ( $target_pages === 'none' ) {
+			return 'embed_only';
+		}
 		return $target_pages === 'all' ? 'all_pages' : 'specific_pages';
 	}
 
