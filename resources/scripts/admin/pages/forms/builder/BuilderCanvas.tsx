@@ -9,7 +9,7 @@ import type { FormSection } from './types';
 interface BuilderCanvasProps {
 	sections: FormSection[];
 	onSectionsChange: (sections: FormSection[]) => void;
-	onScrollChange?: (scrolled: boolean, progress: number) => void;
+	onScrollChange?: (scrolled: boolean) => void;
 	activeSectionIndex?: number;
 	onActiveSectionChange?: (sectionIndex: number) => void;
 }
@@ -168,13 +168,7 @@ const BuilderCanvas = ({
 	}
 
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const el = e.currentTarget;
-		const scrolled = el.scrollTop > 0;
-		const progress =
-			el.scrollHeight <= el.clientHeight
-				? 0
-				: el.scrollTop / (el.scrollHeight - el.clientHeight);
-		onScrollChange?.(scrolled, progress);
+		onScrollChange?.(e.currentTarget.scrollTop > 0);
 	};
 
 	const section = sections[currentIdx];

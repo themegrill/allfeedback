@@ -25,7 +25,7 @@ import type {
 interface SettingsPanelProps {
 	settings: FormSettings;
 	onChange: (settings: FormSettings) => void;
-	onScrollChange?: (scrolled: boolean, progress: number) => void;
+	onScrollChange?: (scrolled: boolean) => void;
 }
 
 const labelCls = 'text-base font-normal text-foreground/90';
@@ -179,13 +179,7 @@ const SettingsPanel = ({
 	}
 
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const el = e.currentTarget;
-		const scrolled = el.scrollTop > 0;
-		const progress =
-			el.scrollHeight <= el.clientHeight
-				? 0
-				: el.scrollTop / (el.scrollHeight - el.clientHeight);
-		onScrollChange?.(scrolled, progress);
+		onScrollChange?.(e.currentTarget.scrollTop > 0);
 	};
 
 	return (

@@ -442,9 +442,7 @@ const FormBuilder = () => {
 
 	const [activeSectionIndex, setActiveSectionIndex] = useState(-1);
 	const [canvasScrolled, setCanvasScrolled] = useState(false);
-	const [canvasProgress, setCanvasProgress] = useState(0);
 	const [settingsScrolled, setSettingsScrolled] = useState(false);
-	const [settingsProgress, setSettingsProgress] = useState(0);
 	const [previewDevice, setPreviewDevice] = useState<PreviewDevice>('desktop');
 	const [previewWidth, setPreviewWidth] = useState(getInitialPreviewWidth);
 	const [publishMenuOpen, setPublishMenuOpen] = useState(false);
@@ -1032,23 +1030,6 @@ const FormBuilder = () => {
 								</Fragment>
 							);
 						})}
-
-						{activeTab === 'builder' && canvasScrolled && (
-							<div className="bg-border/40 absolute inset-x-0 bottom-0 h-[2px]">
-								<div
-									className="bg-primary/60 h-full transition-[width] duration-75"
-									style={{ width: `${canvasProgress * 100}%` }}
-								/>
-							</div>
-						)}
-						{activeTab === 'settings' && settingsScrolled && (
-							<div className="bg-border/40 absolute inset-x-0 bottom-0 h-[2px]">
-								<div
-									className="bg-primary/60 h-full transition-[width] duration-75"
-									style={{ width: `${settingsProgress * 100}%` }}
-								/>
-							</div>
-						)}
 					</div>
 
 					<div className="flex flex-1 overflow-hidden">
@@ -1058,10 +1039,7 @@ const FormBuilder = () => {
 								onSectionsChange={handleSectionsChange}
 								activeSectionIndex={activeSectionIndex}
 								onActiveSectionChange={setActiveSectionIndex}
-								onScrollChange={(scrolled, progress) => {
-									setCanvasScrolled(scrolled);
-									setCanvasProgress(progress);
-								}}
+								onScrollChange={setCanvasScrolled}
 							/>
 						)}
 
@@ -1069,10 +1047,7 @@ const FormBuilder = () => {
 							<SettingsPanel
 								settings={settings}
 								onChange={handleSettingsChange}
-								onScrollChange={(scrolled, progress) => {
-									setSettingsScrolled(scrolled);
-									setSettingsProgress(progress);
-								}}
+								onScrollChange={setSettingsScrolled}
 							/>
 						)}
 
