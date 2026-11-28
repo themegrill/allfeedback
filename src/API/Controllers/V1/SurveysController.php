@@ -416,7 +416,8 @@ class SurveysController extends RestController {
 			if ( is_wp_error( $settings_check ) ) {
 				return $settings_check;
 			}
-			/** This filter is documented in store(). */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint			$settings_raw = apply_filters( 'allfeedback_settings_before_save', $settings_raw, $request );
+			/** This filter is documented in store(). */ // phpcs:ignore Generic.Commenting.DocComment.MissingShort -- inline type hint
+			$settings_raw = apply_filters( 'allfeedback_settings_before_save', $settings_raw, $request );
 			$survey->setSettings( $this->normaliseJsonParam( $settings_raw ) ?? [] );
 			$changed = true;
 		}
